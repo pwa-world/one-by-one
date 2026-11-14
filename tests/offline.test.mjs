@@ -1,0 +1,37 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+const code=await readFile(new URL('../dist/sw.js',import.meta.url),'utf8');
+function worker({network=true,failInstall=false}={}) {
+  const listeners={},entries=new Map(),stores=new Map([['other-app-cache',new Map()],['cloudpost-shell-old',new Map()]]);
+  const calls={network:0,claimed:0,skipped:0};
+  const base='https://example.test/game/';
+  const caches={
+    open:async name=>{stores.set(name,entries);return {addAll:async assets=>{if(failInstall)throw new Error('network interrupted');for(const a of assets)entries.set(new URL(a,base).href,`cached:${a}`);}};},
+    keys:async()=>[...stores.keys()],delete:async name=>stores.delete(name),
+    match:async request=>{const url=typeof request==='string'?request:request.url;return entries.get(url);}
+  };
+  const self={location:{origin:'https://example.test'},registration:{scope:base},clients:{claim:async()=>{calls.claimed++;}},skipWaiting:async()=>{calls.skipped++;},addEventListener:(name,fn)=>listeners[name]=fn};
+  vm.runInNewContext(code,{self,caches,URL,fetch:async()=>{calls.network++;if(!network)throw new Error('offline');return 'network';}});
+  const lifecycle=name=>{let promise;listeners[name]({waitUntil:p=>promise=p});return promise;};
+  const request=(url,mode='cors',method='GET')=>{let response;listeners.fetch({request:{url,mode,method},respondWith:p=>response=p});return response;};
+  return {calls,entries,stores,lifecycle,request};
+}
+test('install pre-caches full shell, then activation cleans only this games old caches',async()=>{
+  const w=worker();await w.lifecycle('install');assert.equal(w.entries.size,11);assert.equal(w.calls.skipped,1);
+  await w.lifecycle('activate');assert.equal(w.calls.claimed,1);assert.ok(w.stores.has('other-app-cache'));assert.ok(!w.stores.has('cloudpost-shell-old'));
+});
+test('installed navigation and all resources load without any network, including subpath deployment',async()=>{
+  const w=worker({network:false});await w.lifecycle('install');
+  assert.equal(await w.request('https://example.test/game/','navigate'),'cached:./index.html');
+  for(const url of w.entries.keys())assert.match(await w.request(url),/^cached:/);
+  assert.equal(w.calls.network,0);
+});
+test('worker never intercepts other origins or mutations',async()=>{
+  const w=worker();await w.lifecycle('install');
+  assert.equal(w.request('https://elsewhere.test/foo'),undefined);assert.equal(w.request('https://example.test/game/save','cors','POST'),undefined);
+});
+test('incomplete shell install fails instead of declaring offline readiness',async()=>{
+  const w=worker({failInstall:true});await assert.rejects(w.lifecycle('install'));assert.equal(w.calls.skipped,0);
+});

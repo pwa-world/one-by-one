@@ -1,0 +1,12 @@
+{
+  "id":"./", "name":"云海邮局 · 把远方寄回身边", "short_name":"云海邮局",
+  "description":"无需体力的温暖合成游戏。修复信件，连接空岛，离线也能慢慢生活。",
+  "lang":"zh-CN", "start_url":"./", "scope":"./", "display":"standalone",
+  "background_color":"#f5f0e4", "theme_color":"#f5f0e4",
+  "icons":[
+    {"src":"./assets/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"./assets/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"},
+    {"src":"./assets/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}
+  ],
+  "categories":["games","entertainment"]
+}

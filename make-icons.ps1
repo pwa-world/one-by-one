@@ -1,0 +1,26 @@
+Add-Type -AssemblyName System.Drawing
+foreach ($size in @(192,512)) {
+  $bitmap = New-Object System.Drawing.Bitmap($size,$size)
+  $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+  $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+  $graphics.ScaleTransform(($size / 192.0),($size / 192.0))
+  $graphics.Clear([System.Drawing.ColorTranslator]::FromHtml('#e8ecdc'))
+  $cream = New-Object System.Drawing.SolidBrush([System.Drawing.ColorTranslator]::FromHtml('#fff8e9'))
+  $green = New-Object System.Drawing.SolidBrush([System.Drawing.ColorTranslator]::FromHtml('#8ca99a'))
+  $gold = New-Object System.Drawing.SolidBrush([System.Drawing.ColorTranslator]::FromHtml('#c59b70'))
+  $pen = New-Object System.Drawing.Pen([System.Drawing.ColorTranslator]::FromHtml('#506e5f'),4)
+  $lightPen = New-Object System.Drawing.Pen([System.Drawing.ColorTranslator]::FromHtml('#fff2d5'),4)
+  $graphics.FillEllipse($cream,28,47,62,48)
+  $graphics.FillEllipse($cream,71,34,79,65)
+  $graphics.FillEllipse($cream,116,59,51,42)
+  $points = [System.Drawing.PointF[]]@([System.Drawing.PointF]::new(37,80),[System.Drawing.PointF]::new(154,71),[System.Drawing.PointF]::new(160,152),[System.Drawing.PointF]::new(43,161))
+  $graphics.FillPolygon($green,$points)
+  $graphics.DrawPolygon($pen,$points)
+  $graphics.DrawLines($pen,[System.Drawing.PointF[]]@([System.Drawing.PointF]::new(38,80),[System.Drawing.PointF]::new(101,123),[System.Drawing.PointF]::new(154,71)))
+  $graphics.DrawLine($pen,43,160,82,110)
+  $graphics.DrawLine($pen,160,152,116,108)
+  $graphics.FillEllipse($gold,84,106,36,36)
+  $graphics.DrawLines($lightPen,[System.Drawing.PointF[]]@([System.Drawing.PointF]::new(93,124),[System.Drawing.PointF]::new(101,132),[System.Drawing.PointF]::new(113,115)))
+  $bitmap.Save((Join-Path $PSScriptRoot "dist/assets/icon-$size.png"),[System.Drawing.Imaging.ImageFormat]::Png)
+  $graphics.Dispose();$bitmap.Dispose();$cream.Dispose();$green.Dispose();$gold.Dispose();$pen.Dispose();$lightPen.Dispose()
+}
