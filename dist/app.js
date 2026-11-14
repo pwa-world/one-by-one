@@ -27,6 +27,8 @@ const cells=Array.from({length:SIZE},(_,index)=>{
 });
 $('.settings-trigger').innerHTML=icon('settings');
 $('#undo-button').innerHTML=icon('undo');
+$('#quick-undo').innerHTML=`${icon('undo')} 撤销`;
+$('#quick-tidy').innerHTML=`${icon('tidy')} 整理`;
 $('[data-action="tidy"]').innerHTML=icon('tidy');
 $('.modal-header [data-action="close"]').innerHTML=icon('close');
 document.querySelectorAll('.mobile-nav button').forEach((button,i)=>button.innerHTML=icon(['home','map','book','settings'][i])+button.textContent);
@@ -105,7 +107,7 @@ function requirements(req) {
 }
 function orderCard(order,slot) {
   const customer=CUSTOMERS[order.customer],ready=!!E.locateRequirements(state,order.req);
-  return `<article class="order-card"><div class="order-person">${avatar(customer[1])}<div><strong>${customer[0]}</strong><small>${escape(order.title)}</small></div></div><p class="order-title">${customer[2]}</p>${requirements(order.req)}<div class="order-bottom"><span class="order-reward">${icon('stamp')} ${order.reward}</span><button class="order-reroll" data-action="reroll" data-slot="${slot}" aria-label="更换${customer[0]}的委托">${icon('refresh')}</button><button class="order-submit ${ready?'ready':''}" data-action="fulfill" data-slot="${slot}" ${ready?'':'disabled'}>${ready?'寄出包裹':'准备中'}</button></div></article>`;
+  return `<article class="order-card"><div class="order-person">${avatar(customer[1])}<div><strong>${customer[0]}</strong><small>${escape(order.title)}</small></div></div><p class="order-title">${customer[2]}</p>${requirements(order.req)}<div class="order-bottom"><span class="order-reward">${icon('stamp')} ${order.reward}</span><button class="order-reroll" data-action="reroll" data-slot="${slot}" aria-label="更换${customer[0]}的委托">${icon('refresh')}</button><button class="order-submit ${ready?'ready':''}" data-action="fulfill" data-slot="${slot}" ${ready?'':'disabled'}><span>${ready?'寄出包裹':'准备中'}</span><small class="mobile-order-reward">+${order.reward} 邮票</small></button></div></article>`;
 }
 function renderOrders() {
   const signature=JSON.stringify([state.orders,state.orders.map(o=>o.req.map(([c,l])=>count(c,l))),state.stats.orders,claimable()]);
@@ -143,7 +145,8 @@ function renderBoard() {
     cell.setAttribute('aria-pressed',String(index===selected));
   });
   $('#space-count').textContent=`空位 ${state.board.filter(i=>!i).length} / 50`;
-  $('#undo-button').disabled=!history.length||readOnly;
+  $('#mobile-space-count').textContent=$('#space-count').textContent;
+  for(const button of document.querySelectorAll('[data-action="undo"]'))button.disabled=!history.length||readOnly;
 }
 function renderSelection() {
   const i=selected!==null?state.board[selected]:null;
@@ -157,7 +160,7 @@ function render() {
   renderBoard();renderSelection();renderOrders();renderIsland();
   $('#storage-button').innerHTML=`${icon('bag')} 仓库 <small>${state.storage.length}/${state.capacity}</small>`;
   $('#collection-button').innerHTML=`${icon('book')} 图鉴 <small>${state.discovered.length}/84</small>`;
-  $('#workshop-button').innerHTML=`${icon('parts')} 生成工坊`;
+  $('#workshop-button').innerHTML=`${icon('parts')} 工坊`;
   document.body.classList.toggle('reduce-motion',state.settings.reducedMotion);
   if($('#modal').open&&['storage','workshop','achievements','collection','settings'].includes(currentView))renderModal();
 }
@@ -187,7 +190,7 @@ function renderModal() {
     ['生产与合成','点击棋盘边缘的生成器生产。相同种类、相同等级的两个物品，可以合成更高一级，最高 7 级。生成器位置固定。'],
     ['两种操作方式','拖动一个物品到另一个物品上；也可以先点击物品，再点击目标。点击空格移动，点击不同物品切换选择；拖动到不同物品上则互换位置。键盘可用方向键、Enter 和空格操作。'],
     ['恰好合到需要的等级','订单需要指定等级，较高级物品不能代替。点需求图标查看合成路线。仓库里的物品也能直接交单。'],
-    ['满盘也不用着急','先合成、交单，或把物品存进仓库。回收闲置物品可获得零件，用来升级生成器；上方的撤销按钮可以回退最近 20 次操作。'],
+    ['满盘也不用着急','先合成、交单，或把物品存进仓库。回收闲置物品可获得零件，用来升级生成器；撤销按钮可以回退最近 20 次操作。'],
     ['让世界一点点变大','每章完成 3 项建设，开启下一座岛。共 6 章、18 项建设、84 种物品。主线结束后仍可继续委托和收集。'],
     ['安心保存','自动保存在当前浏览器和网站地址下；不同地址、浏览器、设备不共用存档。清理网站数据前请导出备份。安装到主屏幕后依然使用本机进度。']
   ].map(([title,text],i)=>`<div class="help-step"><span class="step-number">${i+1}</span><div><strong>${title}</strong><p>${text}</p></div></div>`).join('')}</div><button class="primary-button full-width" data-action="close">明白了，慢慢来</button>`;
@@ -200,13 +203,13 @@ function renderModal() {
   else if(currentView==='letter') {const c=CHAPTERS[modalData??E.chapterOf(state)];html=`<div class="order-person" style="margin-bottom:18px">${avatar(c.avatar)}<div><strong>${c.resident}</strong><small>${c.name} · ${c.role}</small></div></div><p class="letter-text">${c.letter}</p><button class="secondary-button full-width" data-action="journal">收进我的手帐 ${icon('book')}</button>`;}
   else if(currentView==='item') {
     const {c,l}=modalData,g=GENERATORS.find(g=>g.chains.includes(c));
-    html=`<div class="item-detail-hero">${itemArt(c,l)}<div><h3>${itemName({c,l})}</h3><p>${CHAINS[c].name}系列 · ${l} 级<br>${state.discovered.includes(`${c}:${l}`)?'已经发现':'还未发现'} · 库存 ${count(c,l)} 件</p></div></div><p>来源：${g.name}。${E.unlocked(state,g)?'生成器可以随时生产。':`抵达${CHAPTERS[g.chapter].name}后解锁。`}</p>${l>1?`<div class="recipe">${itemArt(c,l-1)}<span>＋</span>${itemArt(c,l-1)}${icon('arrow')}${itemArt(c,l)}</div><p class="muted-note" style="text-align:center">2 件${itemName({c,l:l-1})} → 1 件${itemName({c,l})}</p>`:''}<div class="collection-family"><h3>完整合成路线</h3><div class="chain-row">${CHAINS[c].names.map((name,i)=>`<button class="collection-item" data-action="item" data-chain="${c}" data-level="${i+1}" style="background:none;padding:0">${itemArt(c,i+1)}<small>${name}</small><span class="level-label">LV.${i+1}</span></button>`).join('')}</div></div><p class="tip">订单需要恰好的等级。合过头时，可以用工作台上方的撤销按钮回退。</p>`;
+    html=`<div class="item-detail-hero">${itemArt(c,l)}<div><h3>${itemName({c,l})}</h3><p>${CHAINS[c].name}系列 · ${l} 级<br>${state.discovered.includes(`${c}:${l}`)?'已经发现':'还未发现'} · 库存 ${count(c,l)} 件</p></div></div><p>来源：${g.name}。${E.unlocked(state,g)?'生成器可以随时生产。':`抵达${CHAPTERS[g.chapter].name}后解锁。`}</p>${l>1?`<div class="recipe">${itemArt(c,l-1)}<span>＋</span>${itemArt(c,l-1)}${icon('arrow')}${itemArt(c,l)}</div><p class="muted-note" style="text-align:center">2 件${itemName({c,l:l-1})} → 1 件${itemName({c,l})}</p>`:''}<div class="collection-family"><h3>完整合成路线</h3><div class="chain-row">${CHAINS[c].names.map((name,i)=>`<button class="collection-item" data-action="item" data-chain="${c}" data-level="${i+1}" style="background:none;padding:0">${itemArt(c,i+1)}<small>${name}</small><span class="level-label">LV.${i+1}</span></button>`).join('')}</div></div><p class="tip">订单需要恰好的等级。合过头时，可以用工作台的撤销按钮回退。</p>`;
   }
   else if(currentView==='story') {const r=modalData;html=`<div class="intro-art">${scene(E.chapterOf(state),state.built)}</div><p class="lead">${r.project.name}</p><p class="letter-text">${r.project.text}</p>${r.newChapter?`<p class="tip">已抵达 ${ch.name} · 收到 60 邮票和 4 零件。<br>${GENERATORS.filter(g=>g.chapter===E.chapterOf(state)).map(g=>`新生成器「${g.name}」已经准备好了。`).join('')}</p>`:''}<button class="primary-button full-width" data-action="${r.ending?'ending':r.newChapter?'new-letter':'close'}">${r.ending?'读一读最后的回信':r.newChapter?'打开新岛屿的来信':'继续慢慢生活'} ${icon('arrow')}</button>`;}
   else if(currentView==='ending')html=`<div class="intro-art">${scene(5,18)}</div><div class="ending-stamp">远方有回音</div><p class="letter-text">${CHAPTERS[5].projects[2].text}</p><p class="tip">全部 6 条航线、18 项建设已经完成。居民委托会一直继续，你也可以收藏全部 84 种物品，完成剩余的小成就。</p><button class="primary-button full-width" data-action="close">邮局明天，也照常营业</button>`;
   else if(currentView==='recycle') {const item=state.board[modalData];html=`<div class="item-detail-hero">${itemArt(item.c,item.l)}<div><h3>${itemName(item)}</h3><p>回收后获得 ${Math.max(1,Math.floor(E.valueOf(item)/2))} 零件</p></div></div><p>零件可用于升级生成器。回收后可以通过撤销按钮恢复物品。</p><div class="actions"><button class="primary-button" data-action="confirm-recycle" data-index="${modalData}">回收物品</button><button class="secondary-button" data-action="close">再留一会儿</button></div>`;}
   else if(currentView==='reroll')html=`<p class="lead">这份委托可以留给下一位信使。</p><p>免费换一份新的委托，已有的物品都会保留。更换不会获得奖励，也不会扣除资源。</p><div class="actions"><button class="primary-button" data-action="confirm-reroll" data-slot="${modalData}">换一份委托</button><button class="secondary-button" data-action="close">保留这份</button></div>`;
-  else if(currentView==='settings')html=`<div class="setting-row"><div><strong>轻轻的合成音效</strong><p>由设备生成，无需下载音频</p></div><input class="toggle" type="checkbox" data-setting="sound" aria-label="合成音效" ${state.settings.sound?'checked':''}></div><div class="setting-row"><div><strong>减少动态效果</strong><p>让合成与界面切换更安静</p></div><input class="toggle" type="checkbox" data-setting="reducedMotion" aria-label="减少动态效果" ${state.settings.reducedMotion?'checked':''}></div><section class="settings-section"><h3>把回忆，好好留住</h3><p>进度自动保存在当前浏览器。换设备、换浏览器或清理网站数据前，记得导出存档。</p><div class="actions"><button class="primary-button" data-action="export">${icon('download')} 导出存档</button><button class="secondary-button" data-action="import">导入存档</button><button class="secondary-button" data-action="backup">恢复上次备份</button></div><p class="storage-info">${saveAvailable?'本机自动保存已启用':'自动保存暂不可用，请导出存档'} · 存档版本 1<br>最近保存：${new Date(state.savedAt).toLocaleString('zh-CN')}</p></section><hr><h3>把邮局放进口袋</h3><p id="offline-detail">${offlineReady?'离线资源已准备好。断开网络后仍可生产、合成、建设和保存。':'正在准备离线资源，请在联网状态下稍等片刻。'}</p><div class="actions"><button class="secondary-button" data-action="install">${icon('download')} 安装到设备</button><button class="secondary-button" data-action="help">玩法指南</button></div><p class="muted-note">iPhone / iPad：用 Safari 打开，点“分享 → 添加到主屏幕”。其他设备可使用浏览器菜单里的安装选项。首次访问需加载完整资源。</p><hr><button class="secondary-button danger-button" data-action="reset">重新开始旅程</button><p class="muted-note">云海邮局 v1.0.1 · 一封信，一个温柔的小世界。</p>`;
+  else if(currentView==='settings')html=`<div class="setting-row"><div><strong>轻轻的合成音效</strong><p>由设备生成，无需下载音频</p></div><input class="toggle" type="checkbox" data-setting="sound" aria-label="合成音效" ${state.settings.sound?'checked':''}></div><div class="setting-row"><div><strong>减少动态效果</strong><p>让合成与界面切换更安静</p></div><input class="toggle" type="checkbox" data-setting="reducedMotion" aria-label="减少动态效果" ${state.settings.reducedMotion?'checked':''}></div><section class="settings-section"><h3>把回忆，好好留住</h3><p>进度自动保存在当前浏览器。换设备、换浏览器或清理网站数据前，记得导出存档。</p><div class="actions"><button class="primary-button" data-action="export">${icon('download')} 导出存档</button><button class="secondary-button" data-action="import">导入存档</button><button class="secondary-button" data-action="backup">恢复上次备份</button></div><p class="storage-info">${saveAvailable?'本机自动保存已启用':'自动保存暂不可用，请导出存档'} · 存档版本 1<br>最近保存：${new Date(state.savedAt).toLocaleString('zh-CN')}</p></section><hr><h3>把邮局放进口袋</h3><p id="offline-detail">${offlineReady?'离线资源已准备好。断开网络后仍可生产、合成、建设和保存。':'正在准备离线资源，请在联网状态下稍等片刻。'}</p><div class="actions"><button class="secondary-button" data-action="install">${icon('download')} 安装到设备</button><button class="secondary-button" data-action="help">玩法指南</button></div><p class="muted-note">iPhone / iPad：用 Safari 打开，点“分享 → 添加到主屏幕”。其他设备可使用浏览器菜单里的安装选项。首次访问需加载完整资源。</p><hr><button class="secondary-button danger-button" data-action="reset">重新开始旅程</button><p class="muted-note">云海邮局 v1.0.2 · 一封信，一个温柔的小世界。</p>`;
   else if(currentView==='import')html=`<p class="lead">找到了一段云海旅程。</p><p>修复 ${pendingImport.built} / 18 项建设，完成 ${pendingImport.stats.orders} 份委托，收藏 ${pendingImport.discovered.length} 种物品。</p><p class="tip">载入后会替换当前进度，现有有效存档会保留为上次备份。也可以先导出当前进度。</p><div class="actions"><button class="primary-button" data-action="confirm-import">载入这份存档</button><button class="secondary-button" data-action="export">先导出当前进度</button><button class="secondary-button" data-action="close">取消</button></div>`;
   else if(currentView==='reset')html=`<p class="lead">每一次出发，都值得认真告别。</p><p>这会清空当前旅程。建议先导出存档，之后还可以回来。</p><input class="safety-confirm" id="reset-confirm" placeholder="输入“重新开始”确认" aria-label="输入重新开始确认"><div class="actions"><button class="secondary-button" data-action="export">导出存档</button><button class="secondary-button danger-button" data-action="confirm-reset">开始新的旅程</button></div>`;
   else if(currentView==='conflict')html=`<p class="lead">另一窗口保存了新的进度。</p><p>为避免相互覆盖，这个窗口暂时停止保存。请载入最新进度继续；也可以先导出这个窗口中的进度。</p><div class="actions"><button class="primary-button" data-action="reload">载入最新进度</button><button class="secondary-button" data-action="export">导出此窗口进度</button></div>`;
@@ -326,6 +329,7 @@ board.addEventListener('keydown',event=>{
 });
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;});
 function offlineStatus() {
+  $('#mobile-offline-status').textContent=offlineReady?(navigator.onLine?'离线就绪':'离线中'):'准备离线';
   $('#offline-status').textContent=offlineReady?`${navigator.onLine?'离线已就绪':'正在离线游玩'} · ${saveAvailable?'本机自动存档':'请手动导出存档'}`:'本机存档 · 离线资源尚未就绪';
   if(currentView==='settings')renderModal();
 }

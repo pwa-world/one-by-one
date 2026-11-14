@@ -1,5 +1,5 @@
-const CACHE = 'cloudpost-shell-v1.0.1-r2';
-const ASSETS = ['./','./index.html','./style.css','./app.js','./data.js','./engine.js','./save-store.js','./art.js','./manifest.webmanifest','./assets/icon.svg','./assets/icon-192.png','./assets/icon-512.png'];
+const CACHE = 'cloudpost-shell-v1.0.2-r2';
+const ASSETS = ['./','./index.html','./style.css','./mobile.css','./app.js','./data.js','./engine.js','./save-store.js','./art.js','./manifest.webmanifest','./assets/icon.svg','./assets/icon-192.png','./assets/icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS.map(path=>new Request(path,{cache:'reload'})))).then(()=>self.skipWaiting()));
 });

@@ -1,0 +1,144 @@
+/* Phone workbench: reserve room for 44px controls before sizing the board.
+   Keep natural scrolling on very short screens and when text is enlarged. */
+body {
+  --phone-overhead: 294px;
+  --phone-nav: 52px;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: calc(var(--phone-nav) + env(safe-area-inset-bottom, 0px));
+}
+.app-shell { padding: 0 10px; max-width: 520px; }
+.site-header { height: 42px; gap: 8px; }
+.brand { gap: 7px; }
+.brand img { width: 28px; height: 28px; }
+.brand > span { font-size: 20px; letter-spacing: 1px; }
+.brand small, .settings-trigger { display: none; }
+.wallet { gap: 6px; min-width: 0; }
+.currency { padding: 3px 8px; gap: 5px; font-size: 12px; min-width: 0; }
+.currency span { max-width: 78px; overflow: hidden; text-overflow: ellipsis; }
+.currency .ui-icon { width: 16px; height: 16px; }
+.intro-line { height: 18px; padding: 0; align-items: center; gap: 10px; font-size: 10px; letter-spacing: 0; }
+.intro-line .opening-note { display: none; }
+.intro-line .compact-status { display: flex; gap: 9px; min-width: 0; flex-shrink: 0; }
+#mobile-offline-status { color: #738b70; }
+#save-status { display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.desk-heading, .desk-hint, .site-footer { display: none; }
+.desk-panel { min-width: 0; }
+
+/* One complete order remains readable, with a glimpse of the next order.
+   The horizontal strip scrolls independently of the workbench. */
+.mobile-orders {
+  height: 64px;
+  margin: 0 0 4px;
+  padding: 0;
+  gap: 6px;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 0;
+  touch-action: pan-x pan-y;
+}
+.mobile-orders .order-card {
+  flex: 0 0 calc(100% - 18px);
+  height: 64px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 110px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  margin: 0;
+  border-radius: 9px;
+  box-shadow: none;
+  scroll-snap-align: start;
+}
+.mobile-orders .order-card:last-child { flex-basis: 100%; }
+.mobile-orders .order-card:after { display: none; }
+.mobile-orders .order-person { flex-direction: column; gap: 0; min-width: 0; }
+.mobile-orders .order-person .avatar { width: 26px; height: 26px; }
+.mobile-orders .order-person strong { display: block; font-size: 10px; white-space: nowrap; }
+.mobile-orders .order-person small, .mobile-orders .order-title { display: none; }
+.mobile-orders .requirements { margin: 0; gap: 3px; min-height: 44px; flex-wrap: nowrap; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.mobile-orders .requirement { width: 44px; height: 44px; min-width: 44px; flex-shrink: 0; border-radius: 7px; }
+.mobile-orders .req-check { right: 0; bottom: 0; }
+.mobile-orders .order-bottom { margin: 0; width: 110px; gap: 2px; align-items: center; }
+.mobile-orders .order-reward { display: none; }
+.mobile-orders .order-reroll { order: 2; margin: 0; width: 44px; height: 44px; flex-shrink: 0; }
+.mobile-orders .order-reroll .ui-icon { width: 16px; height: 16px; }
+.mobile-orders .order-submit {
+  order: 1;
+  width: 64px;
+  min-width: 64px;
+  min-height: 44px;
+  padding: 3px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.mobile-orders .order-submit:disabled { opacity: .8; }
+.mobile-orders .mobile-order-reward { display: block; font-size: 10px; line-height: 1.5; }
+
+/* 7 columns / 8 rows, 3px gutters, 4px shell padding and a 1px border.
+   Below the practical minimum, allow scrolling instead of tiny controls. */
+.board-wrap {
+  width: min(100%, max(308px, calc((100dvh - var(--phone-overhead) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) * .875 + 9.625px)));
+  margin: 0 auto;
+  padding: 4px;
+  border-radius: 11px;
+  box-shadow: 0 2px 0 #d6cfba;
+}
+.board-top { display: none; }
+.board { gap: 3px; }
+.cell { padding: 1px; border-radius: 6px; }
+.cell .item-art, .cell .generator-art { width: 96%; height: 96%; }
+.item-level { font-size: 10px; right: 3px; bottom: 3px; }
+.gen-level { font-size: 8px; }
+.selection-bar {
+  height: 48px;
+  min-height: 48px;
+  margin-top: 4px;
+  padding: 2px 3px;
+  gap: 5px;
+}
+.selection-bar > .item-art, .selection-bar > .generator-art { width: 30px; height: 30px; }
+.selected-description { min-width: 0; }
+.selected-description strong { font-size: 12px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.selected-description small { display: block; font-size: 10px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.selection-actions { gap: 2px; }
+.selection-actions button { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
+.selection-actions .ui-icon { width: 19px; height: 19px; }
+.empty-selection { gap: 7px; font-size: 11px; line-height: 1.5; }
+.empty-selection > .ui-icon { width: 20px; height: 20px; }
+.desk-tools { margin-top: 4px; gap: 3px; }
+.desk-tools .tool-button {
+  display: inline-flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 3px 2px;
+  gap: 3px;
+  font-size: 11px;
+  border-radius: 8px;
+}
+.desk-tools .tool-button .ui-icon { width: 17px; height: 17px; }
+.desk-tools .tool-button small { display: none; }
+.mobile-nav {
+  height: calc(var(--phone-nav) + env(safe-area-inset-bottom, 0px));
+  min-height: 0;
+  padding: 3px 10px calc(3px + env(safe-area-inset-bottom, 0px));
+  gap: 4px;
+}
+.mobile-nav button { min-height: 44px; padding: 2px 4px; gap: 1px; line-height: 1.2; }
+.mobile-nav .ui-icon { width: 18px; height: 18px; }
+.toast { bottom: calc(var(--phone-nav) + 8px + env(safe-area-inset-bottom, 0px)); }
+.modal-header .icon-button { min-width: 44px; min-height: 44px; }
+.primary-button, .secondary-button, .modal-body .actions button { min-height: 44px; }
+.island-panel.mobile-visible { padding: 8px 0 16px; }
+
+@media (max-height: 620px) {
+  body { --phone-overhead: 242px; --phone-nav: 48px; }
+  .site-header { height: 32px; }
+  .brand img { width: 24px; height: 24px; }
+  .brand > span { font-size: 18px; }
+  .intro-line { display: none; }
+  .mobile-orders, .mobile-orders .order-card { height: 48px; }
+  .mobile-orders .order-card { padding-top: 1px; padding-bottom: 1px; }
+  .selection-bar, .desk-tools { margin-top: 0; }
+  .mobile-nav { padding-top: 1px; padding-bottom: calc(1px + env(safe-area-inset-bottom, 0px)); }
+}

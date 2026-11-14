@@ -12,6 +12,7 @@
   <link rel="apple-touch-icon" href="./assets/icon-192.png">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./mobile.css" media="(max-width: 760px)">
   <script type="module" src="./app.js"></script>
 </head>
 <body>
@@ -22,18 +23,18 @@
       <div class="wallet" id="wallet"></div>
       <button class="icon-button settings-trigger" data-action="settings" aria-label="设置与存档"></button>
     </header>
-    <div class="intro-line"><span><i class="status-dot"></i> 今日邮局，照常营业</span><span id="save-status" role="status">正在打开邮局…</span></div>
+    <div class="intro-line"><span class="opening-note"><i class="status-dot"></i> 今日邮局，照常营业</span><span class="compact-status"><span id="mobile-space-count"></span><span id="mobile-offline-status">准备离线</span></span><span id="save-status" role="status">正在打开邮局…</span></div>
     <main class="game-layout">
       <aside class="island-panel" id="island-panel" aria-label="岛屿与建设"></aside>
       <section class="desk-panel" id="desk-panel" aria-label="合成工作台">
         <div class="desk-heading"><div><div class="eyebrow">A LITTLE MAGIC, A LITTLE MAIL</div><h1>把远方，寄回身边<span>。</span></h1></div><span class="cozy-tag">随心合成 · 无需体力</span></div>
-        <div class="mobile-orders" id="mobile-orders"></div>
+        <div class="mobile-orders" id="mobile-orders" aria-label="居民委托，可左右滑动"></div>
         <div class="board-wrap">
           <div class="board-top"><span id="board-caption">邮局工作台</span><div><span id="space-count" class="space-count"></span><button class="icon-button" data-action="undo" id="undo-button" aria-label="撤销上一步"></button><button class="icon-button" data-action="tidy" aria-label="整理工作台"></button></div></div>
           <div id="board" class="board" role="group" aria-label="7 列 8 行合成工作台"></div>
           <div class="selection-bar" id="selection-bar"></div>
         </div>
-        <div class="desk-tools"><button data-action="storage" class="tool-button" id="storage-button"></button><button data-action="collection" class="tool-button" id="collection-button"></button><button data-action="workshop" class="tool-button" id="workshop-button"></button></div>
+        <div class="desk-tools" aria-label="工作台常用操作"><button data-action="undo" class="tool-button mobile-quick" id="quick-undo" aria-label="撤销上一步"></button><button data-action="storage" class="tool-button" id="storage-button"></button><button data-action="tidy" class="tool-button mobile-quick" id="quick-tidy" aria-label="整理工作台"></button><button data-action="collection" class="tool-button" id="collection-button"></button><button data-action="workshop" class="tool-button" id="workshop-button"></button></div>
         <p class="desk-hint" id="desk-hint">点击邮袋或工具箱生成物品 · 将两个相同物品合在一起</p>
       </section>
       <aside class="orders-panel" id="orders-panel" aria-label="居民委托"></aside>
