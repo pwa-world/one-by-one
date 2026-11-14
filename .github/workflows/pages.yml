@@ -17,9 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out game source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: '22'
       - name: Check game, saves and offline assets
@@ -30,9 +30,9 @@ jobs:
             node --check "$file"
           done
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6.0.0
       - name: Package the offline game
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: dist
 
@@ -48,4 +48,4 @@ jobs:
     steps:
       - name: Publish GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5.0.1
