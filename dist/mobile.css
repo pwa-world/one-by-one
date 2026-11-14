@@ -24,8 +24,8 @@ body {
 .desk-heading, .desk-hint, .site-footer { display: none; }
 .desk-panel { min-width: 0; }
 
-/* One complete order remains readable, with a glimpse of the next order.
-   The horizontal strip scrolls independently of the workbench. */
+/* Intrinsic widths: one material uses one 44px cell, two use two cells.
+   Reserve a separate 44px reroll target above the reward. */
 .mobile-orders {
   height: 64px;
   margin: 0 0 4px;
@@ -36,43 +36,37 @@ body {
   touch-action: pan-x pan-y;
 }
 .mobile-orders .order-card {
-  flex: 0 0 calc(100% - 18px);
+  flex: 0 0 auto;
+  width: max-content;
   height: 64px;
   min-width: 0;
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) 110px;
+  grid-template-columns: max-content 44px;
+  grid-template-rows: 14px 44px;
   align-items: center;
-  gap: 6px;
-  padding: 5px;
+  column-gap: 4px;
+  row-gap: 0;
+  padding: 2px;
   margin: 0;
   border-radius: 9px;
   box-shadow: none;
   scroll-snap-align: start;
 }
-.mobile-orders .order-card:last-child { flex-basis: 100%; }
 .mobile-orders .order-card:after { display: none; }
-.mobile-orders .order-person { flex-direction: column; gap: 0; min-width: 0; }
-.mobile-orders .order-person .avatar { width: 26px; height: 26px; }
+.mobile-orders .order-person { grid-area: 1 / 1; gap: 0; min-width: 0; padding: 0 0 0 2px; }
+.mobile-orders .order-person .avatar { display: none; }
 .mobile-orders .order-person strong { display: block; font-size: 10px; white-space: nowrap; }
 .mobile-orders .order-person small, .mobile-orders .order-title { display: none; }
-.mobile-orders .requirements { margin: 0; gap: 3px; min-height: 44px; flex-wrap: nowrap; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.mobile-orders .requirements { grid-area: 2 / 1; margin: 0; gap: 3px; min-height: 44px; flex-wrap: nowrap; }
 .mobile-orders .requirement { width: 44px; height: 44px; min-width: 44px; flex-shrink: 0; border-radius: 7px; }
 .mobile-orders .req-check { right: 0; bottom: 0; }
-.mobile-orders .order-bottom { margin: 0; width: 110px; gap: 2px; align-items: center; }
-.mobile-orders .order-reward { display: none; }
-.mobile-orders .order-reroll { order: 2; margin: 0; width: 44px; height: 44px; flex-shrink: 0; }
+.mobile-orders .order-bottom { grid-area: 2 / 2; align-self: end; margin: 0; padding-bottom: 1px; justify-content: center; }
+.mobile-orders .order-reward { display: flex; gap: 1px; font-size: 11px; white-space: nowrap; }
+.mobile-orders .order-reward .ui-icon { width: 11px; height: 11px; }
+.mobile-orders .order-reroll { top: 0; right: 0; margin: 0; width: 44px; height: 44px; }
 .mobile-orders .order-reroll .ui-icon { width: 16px; height: 16px; }
-.mobile-orders .order-submit {
-  order: 1;
-  width: 64px;
-  min-width: 64px;
-  min-height: 44px;
-  padding: 3px;
-  font-size: 12px;
-  line-height: 1.4;
-}
-.mobile-orders .order-submit:disabled { opacity: .8; }
-.mobile-orders .mobile-order-reward { display: block; font-size: 10px; line-height: 1.5; }
+.mobile-orders .is-ready .order-person { visibility: hidden; }
+.mobile-orders .order-ready-hint { position: absolute; top: 2px; left: 4px; font-size: 10px; line-height: 14px; }
 
 /* 7 columns / 8 rows, 3px gutters, 4px shell padding and a 1px border.
    Below the practical minimum, allow scrolling instead of tiny controls. */
@@ -132,13 +126,12 @@ body {
 .island-panel.mobile-visible { padding: 8px 0 16px; }
 
 @media (max-height: 620px) {
-  body { --phone-overhead: 242px; --phone-nav: 48px; }
-  .site-header { height: 32px; }
-  .brand img { width: 24px; height: 24px; }
+  body { --phone-overhead: 242px; --phone-nav: 45px; }
+  .site-header { height: 23px; line-height: 1; }
+  .brand img { width: 20px; height: 20px; }
   .brand > span { font-size: 18px; }
   .intro-line { display: none; }
-  .mobile-orders, .mobile-orders .order-card { height: 48px; }
-  .mobile-orders .order-card { padding-top: 1px; padding-bottom: 1px; }
   .selection-bar, .desk-tools { margin-top: 0; }
+  .selection-bar { height: 44px; min-height: 44px; padding: 0 3px; border: 0; }
   .mobile-nav { padding-top: 1px; padding-bottom: calc(1px + env(safe-area-inset-bottom, 0px)); }
 }

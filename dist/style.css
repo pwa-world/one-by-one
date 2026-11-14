@@ -13,3 +13,16 @@
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 body.reduce-motion *,body.reduce-motion *:before,body.reduce-motion *:after{animation:none!important;transition:none!important}
 @media(max-width:360px){.mobile-orders{margin-left:-10px;margin-right:-10px;padding-left:10px;padding-right:10px}.cozy-tag{display:none}}
+
+/* The entire ready order is a native submit target; secondary controls stay above it. */
+.order-card.is-ready{background:#edf2e0;border-color:#8fae7b;box-shadow:inset 0 0 0 1px #b2c69c}
+.order-card:after{display:none}
+.order-card .order-person{padding-right:30px}
+.order-submit-area{position:absolute;inset:0;width:100%;height:100%;padding:0;border:0;border-radius:inherit;background:transparent;z-index:1}
+.order-submit-area:disabled{pointer-events:none}
+.order-submit-area:focus-visible{outline:3px solid #557e68;outline-offset:-3px}
+.order-card>:not(.order-submit-area):not(.order-reroll){pointer-events:none}
+.order-card .requirement[data-action]{position:relative;z-index:2;pointer-events:auto}
+.order-card .order-reroll{position:absolute;top:4px;right:4px;z-index:2;pointer-events:auto;width:44px;height:44px;margin:0;border-radius:8px}
+.order-card .order-reroll:focus-visible{outline:2px solid #557e68;outline-offset:-3px}
+.order-ready-hint{font-size:12px;color:#4f7656;font-weight:600;white-space:nowrap}
