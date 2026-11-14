@@ -8,6 +8,7 @@ const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=
 http.createServer(async(req,res)=>{
   try{
     const url=new URL(req.url,'http://localhost');
+    if(url.pathname==='/qa/art') {res.writeHead(200,{'Content-Type':types['.html'],'Cache-Control':'no-store'});return res.end(await readFile(path.join(here,'item-art-gallery.html')));}
     if(url.pathname==='/qa/') {res.writeHead(200,{'Content-Type':types['.html'],'Cache-Control':'no-store'});return res.end(await readFile(path.join(here,'browser-harness.html')));}
     if(!url.pathname.startsWith('/one-by-one/')){res.writeHead(404);return res.end();}
     const rel=decodeURIComponent(url.pathname.slice('/one-by-one/'.length))||'index.html',file=path.resolve(root,rel);

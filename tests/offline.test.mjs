@@ -20,7 +20,7 @@ function worker({network=true,failInstall=false}={}) {
   return {calls,entries,stores,lifecycle,request};
 }
 test('install pre-caches full shell, then activation cleans only this games old caches',async()=>{
-  const w=worker();await w.lifecycle('install');assert.equal(w.entries.size,13);assert.equal(w.calls.skipped,1);
+  const w=worker();await w.lifecycle('install');assert.equal(w.entries.size,14);assert.equal(w.calls.skipped,1);
   await w.lifecycle('activate');assert.equal(w.calls.claimed,1);assert.ok(w.stores.has('other-app-cache'));assert.ok(!w.stores.has('cloudpost-shell-old'));
 });
 test('installed navigation and all resources load without any network, including subpath deployment',async()=>{
@@ -37,5 +37,16 @@ test('incomplete shell install fails instead of declaring offline readiness',asy
   const w=worker({failInstall:true});await assert.rejects(w.lifecycle('install'));assert.equal(w.calls.skipped,0);
 });
 test('a new offline shell bypasses stale HTTP cache for every asset',async()=>{
-  const w=worker();await w.lifecycle('install');assert.equal(w.calls.cacheModes.length,13);assert.ok(w.calls.cacheModes.every(mode=>mode==='reload'));
+  const w=worker();await w.lifecycle('install');assert.equal(w.calls.cacheModes.length,14);assert.ok(w.calls.cacheModes.every(mode=>mode==='reload'));
+});
+test('every static module dependency is pre-cached, including item illustrations',async()=>{
+  const w=worker();await w.lifecycle('install');
+  for(const url of w.entries.keys()){
+    if(!url.endsWith('.js'))continue;
+    const local=new URL('../dist/'+new URL(url).pathname.slice('/game/'.length),import.meta.url);
+    const script=await readFile(local,'utf8');
+    for(const [,dependency] of script.matchAll(/\bfrom\s*['"](\.\/[^'"]+)['"]/g)){
+      assert.ok(w.entries.has(new URL(dependency,url).href),`${dependency} imported by ${url} must work offline`);
+    }
+  }
 });
