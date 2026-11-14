@@ -11,3 +11,4 @@
 @media(max-width:360px){.app-shell{padding:0 10px}.brand>span{font-size:18px}.brand img{width:29px;height:29px}.currency{padding:5px 7px;font-size:11px}.site-header{gap:6px}.settings-trigger{display:none}.desk-heading h1{font-size:21px}.cozy-tag{font-size:8px}.tool-button{gap:4px}.tool-button small{display:none}.board{gap:3px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 body.reduce-motion *,body.reduce-motion *:before,body.reduce-motion *:after{animation:none!important;transition:none!important}
+@media(max-width:360px){.mobile-orders{margin-left:-10px;margin-right:-10px;padding-left:10px;padding-right:10px}.cozy-tag{display:none}}

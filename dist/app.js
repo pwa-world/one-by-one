@@ -1,8 +1,8 @@
 import {CHAINS, GENERATORS, CHAPTERS, CUSTOMERS, ACHIEVEMENTS, SIZE, itemName, itemKey} from './data.js';
 import * as E from './engine.js';
 import {icon,itemArt,generatorArt,avatar,scene} from './art.js';
+import {SAVE_KEY as KEY,BACKUP_KEY as BACKUP,persistState} from './save-store.js';
 const $=selector=>document.querySelector(selector);
-const KEY='cloudpost.save.v1', BACKUP='cloudpost.backup.v1';
 let state, lastStored=null, saveTimer, maxSaveTimer, loadMessage='', saveAvailable=true, readOnly=false, corruption=false;
 let selected=null, history=[], currentView='', modalData=null, toastTimer, installPrompt=null, offlineReady=false, mobileTab='desk';
 let audioContext, islandSignature='', orderSignature='', pendingImport=null;
@@ -16,7 +16,7 @@ try {
     }
   } else {
     const backup=localStorage.getItem(BACKUP);
-    if(backup)try {state=E.decodeSave(backup);loadMessage='已找回本机备份。';}catch{}
+    if(backup)try {state=E.decodeSave(backup);loadMessage='已找回本机备份。';}catch{corruption=true;readOnly=true;}
   }
 } catch {saveAvailable=false;loadMessage='浏览器无法写入本机存档。请在设置中导出进度，避免关闭后丢失。';}
 state ||= E.newGame();
@@ -46,13 +46,10 @@ function persist(force=false) {
   clearTimeout(saveTimer);clearTimeout(maxSaveTimer);saveTimer=maxSaveTimer=null;
   if(readOnly&&!force)return;
   try {
-    const actual=localStorage.getItem(KEY);
-    if(!force&&actual!==lastStored){conflict();return;}
-    state.savedAt=Date.now();
-    const next=E.encodeSave(state);
-    if(actual){try{E.decodeSave(actual);localStorage.setItem(BACKUP,actual);}catch{}}
-    localStorage.setItem(KEY,next);lastStored=next;saveAvailable=true;
-    saveStatus('进度已保存在本机');
+    const result=persistState(localStorage,state,{expected:lastStored,force});
+    if(result.conflict){conflict();return;}
+    lastStored=result.raw;saveAvailable=true;
+    saveStatus(result.backupFailed?'进度已保存，备份空间不足':'进度已保存在本机',result.backupFailed);
   } catch {
     saveAvailable=false;saveStatus('自动保存失败，请导出存档',true);
     toast('本机存储不可用或已满，请到设置导出存档。');
@@ -165,15 +162,14 @@ function render() {
   if($('#modal').open&&['storage','workshop','achievements','collection','settings'].includes(currentView))renderModal();
 }
 function choose(index) {
-  const item=state.board[index];
-  if(item?.g){selected=index;act(s=>E.spawn(s,item.g),{keepSelection:true});renderBoard();renderSelection();return;}
-  if(selected===index){selected=null;renderBoard();renderSelection();return;}
-  if(selected!==null&&state.board[selected]?.c) {
-    const from=selected,result=act(s=>E.move(s,from,index));
+  const intent=E.tapIntent(state,selected,index);
+  if(intent.kind==='generate'){selected=index;act(s=>E.spawn(s,intent.id),{keepSelection:true});renderBoard();renderSelection();return;}
+  if(intent.kind==='move') {
+    const result=act(s=>E.move(s,intent.from,index));
     if(result.ok){selected=index;renderBoard();renderSelection();}
     return;
   }
-  selected=item?index:null;renderBoard();renderSelection();
+  selected=intent.index;renderBoard();renderSelection();
 }
 
 function openModal(view,data=null) {
@@ -189,7 +185,7 @@ function renderModal() {
   if(currentView==='welcome')html=`<div class="intro-art">${scene(0,0)}</div><p class="lead" style="text-align:center">云海很大，邮局很小。<br>但每一份想念，都值得抵达。</p><p>你接手了一座旧邮局。和信使阿芦一起，整理信件、合成物品，把断开的空岛航线重新连接起来。</p><div class="help-steps"><div class="help-step"><span class="step-number">1</span><div><strong>点击邮袋或工具箱</strong><p>随时生成材料，没有体力，也没有冷却。</p></div></div><div class="help-step"><span class="step-number">2</span><div><strong>把两个相同物品合在一起</strong><p>拖动合成，或先点一个，再点另一个。手机也很轻松。</p></div></div><div class="help-step"><span class="step-number">3</span><div><strong>寄出包裹，慢慢修好邮局</strong><p>订单赚邮票，建设开启新的岛屿和故事。</p></div></div></div><div class="welcome-actions"><button class="primary-button" data-action="welcome">打开邮局的门 ${icon('arrow')}</button></div><p class="muted-note" style="text-align:center">进度自动存在这台设备 · 准备好离线资源后，断网也能玩</p>`;
   else if(currentView==='help')html=`<p class="lead">没有倒计时，按自己的节奏来。</p><div class="help-steps">${[
     ['生产与合成','点击棋盘边缘的生成器生产。相同种类、相同等级的两个物品，可以合成更高一级，最高 7 级。生成器位置固定。'],
-    ['两种操作方式','拖动一个物品到另一个物品上；也可以先点击物品，再点击目标。点击空格移动，点击不同物品互换。键盘可用方向键、Enter 和空格操作。'],
+    ['两种操作方式','拖动一个物品到另一个物品上；也可以先点击物品，再点击目标。点击空格移动，点击不同物品切换选择；拖动到不同物品上则互换位置。键盘可用方向键、Enter 和空格操作。'],
     ['恰好合到需要的等级','订单需要指定等级，较高级物品不能代替。点需求图标查看合成路线。仓库里的物品也能直接交单。'],
     ['满盘也不用着急','先合成、交单，或把物品存进仓库。回收闲置物品可获得零件，用来升级生成器；上方的撤销按钮可以回退最近 20 次操作。'],
     ['让世界一点点变大','每章完成 3 项建设，开启下一座岛。共 6 章、18 项建设、84 种物品。主线结束后仍可继续委托和收集。'],
@@ -210,7 +206,7 @@ function renderModal() {
   else if(currentView==='ending')html=`<div class="intro-art">${scene(5,18)}</div><div class="ending-stamp">远方有回音</div><p class="letter-text">${CHAPTERS[5].projects[2].text}</p><p class="tip">全部 6 条航线、18 项建设已经完成。居民委托会一直继续，你也可以收藏全部 84 种物品，完成剩余的小成就。</p><button class="primary-button full-width" data-action="close">邮局明天，也照常营业</button>`;
   else if(currentView==='recycle') {const item=state.board[modalData];html=`<div class="item-detail-hero">${itemArt(item.c,item.l)}<div><h3>${itemName(item)}</h3><p>回收后获得 ${Math.max(1,Math.floor(E.valueOf(item)/2))} 零件</p></div></div><p>零件可用于升级生成器。回收后可以通过撤销按钮恢复物品。</p><div class="actions"><button class="primary-button" data-action="confirm-recycle" data-index="${modalData}">回收物品</button><button class="secondary-button" data-action="close">再留一会儿</button></div>`;}
   else if(currentView==='reroll')html=`<p class="lead">这份委托可以留给下一位信使。</p><p>免费换一份新的委托，已有的物品都会保留。更换不会获得奖励，也不会扣除资源。</p><div class="actions"><button class="primary-button" data-action="confirm-reroll" data-slot="${modalData}">换一份委托</button><button class="secondary-button" data-action="close">保留这份</button></div>`;
-  else if(currentView==='settings')html=`<div class="setting-row"><div><strong>轻轻的合成音效</strong><p>由设备生成，无需下载音频</p></div><input class="toggle" type="checkbox" data-setting="sound" aria-label="合成音效" ${state.settings.sound?'checked':''}></div><div class="setting-row"><div><strong>减少动态效果</strong><p>让合成与界面切换更安静</p></div><input class="toggle" type="checkbox" data-setting="reducedMotion" aria-label="减少动态效果" ${state.settings.reducedMotion?'checked':''}></div><section class="settings-section"><h3>把回忆，好好留住</h3><p>进度自动保存在当前浏览器。换设备、换浏览器或清理网站数据前，记得导出存档。</p><div class="actions"><button class="primary-button" data-action="export">${icon('download')} 导出存档</button><button class="secondary-button" data-action="import">导入存档</button><button class="secondary-button" data-action="backup">恢复上次备份</button></div><p class="storage-info">${saveAvailable?'本机自动保存已启用':'自动保存暂不可用，请导出存档'} · 存档版本 1<br>最近保存：${new Date(state.savedAt).toLocaleString('zh-CN')}</p></section><hr><h3>把邮局放进口袋</h3><p id="offline-detail">${offlineReady?'离线资源已准备好。断开网络后仍可生产、合成、建设和保存。':'正在准备离线资源，请在联网状态下稍等片刻。'}</p><div class="actions"><button class="secondary-button" data-action="install">${icon('download')} 安装到设备</button><button class="secondary-button" data-action="help">玩法指南</button></div><p class="muted-note">iPhone / iPad：用 Safari 打开，点“分享 → 添加到主屏幕”。其他设备可使用浏览器菜单里的安装选项。首次访问需加载完整资源。</p><hr><button class="secondary-button danger-button" data-action="reset">重新开始旅程</button><p class="muted-note">云海邮局 v1.0 · 一封信，一个温柔的小世界。</p>`;
+  else if(currentView==='settings')html=`<div class="setting-row"><div><strong>轻轻的合成音效</strong><p>由设备生成，无需下载音频</p></div><input class="toggle" type="checkbox" data-setting="sound" aria-label="合成音效" ${state.settings.sound?'checked':''}></div><div class="setting-row"><div><strong>减少动态效果</strong><p>让合成与界面切换更安静</p></div><input class="toggle" type="checkbox" data-setting="reducedMotion" aria-label="减少动态效果" ${state.settings.reducedMotion?'checked':''}></div><section class="settings-section"><h3>把回忆，好好留住</h3><p>进度自动保存在当前浏览器。换设备、换浏览器或清理网站数据前，记得导出存档。</p><div class="actions"><button class="primary-button" data-action="export">${icon('download')} 导出存档</button><button class="secondary-button" data-action="import">导入存档</button><button class="secondary-button" data-action="backup">恢复上次备份</button></div><p class="storage-info">${saveAvailable?'本机自动保存已启用':'自动保存暂不可用，请导出存档'} · 存档版本 1<br>最近保存：${new Date(state.savedAt).toLocaleString('zh-CN')}</p></section><hr><h3>把邮局放进口袋</h3><p id="offline-detail">${offlineReady?'离线资源已准备好。断开网络后仍可生产、合成、建设和保存。':'正在准备离线资源，请在联网状态下稍等片刻。'}</p><div class="actions"><button class="secondary-button" data-action="install">${icon('download')} 安装到设备</button><button class="secondary-button" data-action="help">玩法指南</button></div><p class="muted-note">iPhone / iPad：用 Safari 打开，点“分享 → 添加到主屏幕”。其他设备可使用浏览器菜单里的安装选项。首次访问需加载完整资源。</p><hr><button class="secondary-button danger-button" data-action="reset">重新开始旅程</button><p class="muted-note">云海邮局 v1.0.1 · 一封信，一个温柔的小世界。</p>`;
   else if(currentView==='import')html=`<p class="lead">找到了一段云海旅程。</p><p>修复 ${pendingImport.built} / 18 项建设，完成 ${pendingImport.stats.orders} 份委托，收藏 ${pendingImport.discovered.length} 种物品。</p><p class="tip">载入后会替换当前进度，现有有效存档会保留为上次备份。也可以先导出当前进度。</p><div class="actions"><button class="primary-button" data-action="confirm-import">载入这份存档</button><button class="secondary-button" data-action="export">先导出当前进度</button><button class="secondary-button" data-action="close">取消</button></div>`;
   else if(currentView==='reset')html=`<p class="lead">每一次出发，都值得认真告别。</p><p>这会清空当前旅程。建议先导出存档，之后还可以回来。</p><input class="safety-confirm" id="reset-confirm" placeholder="输入“重新开始”确认" aria-label="输入重新开始确认"><div class="actions"><button class="secondary-button" data-action="export">导出存档</button><button class="secondary-button danger-button" data-action="confirm-reset">开始新的旅程</button></div>`;
   else if(currentView==='conflict')html=`<p class="lead">另一窗口保存了新的进度。</p><p>为避免相互覆盖，这个窗口暂时停止保存。请载入最新进度继续；也可以先导出这个窗口中的进度。</p><div class="actions"><button class="primary-button" data-action="reload">载入最新进度</button><button class="secondary-button" data-action="export">导出此窗口进度</button></div>`;

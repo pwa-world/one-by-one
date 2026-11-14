@@ -56,6 +56,15 @@ export function move(s, from, to) {
   s.board[to]=a;s.board[from]=b;
   return {ok:true,kind:b?'swap':'move',index:to};
 }
+export function tapIntent(s,selected,index) {
+  const item=s.board[index],chosen=selected===null?null:s.board[selected];
+  if(item?.g)return {kind:'generate',id:item.g,index};
+  if(selected===index)return {kind:'select',index:null};
+  if(chosen?.c&&(!item||(item.c===chosen.c&&item.l===chosen.l&&chosen.l<7)))return {kind:'move',from:selected,index};
+  // Selecting another chain must not carry the previous selection around.
+  // Swapping occupied cells remains available through deliberate dragging.
+  return {kind:'select',index:item?index:null};
+}
 export function locateRequirements(s, req) {
   const locations=[]; const used=new Set();
   for (const [c,l] of req) {

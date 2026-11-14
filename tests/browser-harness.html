@@ -1,0 +1,16 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>云海邮局 · 隔离测试环境</title>
+<style>body{font:16px/1.6 sans-serif;max-width:800px;margin:20px auto;padding:12px;background:#f6f0e2;color:#345b4d}button,a{padding:12px;margin:6px;display:inline-block}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}</style>
+<h1>隔离测试环境</h1><p>仅操作 localhost:4187 的测试存档，与线上进度无关。</p>
+<button id="seed">准备独立测试存档</button><button id="corrupt-main">损坏主存档</button><button id="corrupt-both">损坏两份存档</button><button id="recover">恢复测试存档</button><button id="read">读取测试状态</button><a href="/one-by-one/">打开测试游戏</a><pre id="status"></pre>
+<script type="module">
+import {newGame,encodeSave,decodeSave} from '/one-by-one/engine.js';
+const main='cloudpost.save.v1',backup='cloudpost.backup.v1';
+const read=k=>{const raw=localStorage.getItem(k);if(!raw)return null;try{const s=decodeSave(raw);return {coins:s.coins,merges:s.stats.merges,produced:s.stats.produced,discovered:s.discovered.length,savedAt:s.savedAt,items:s.board.map((i,n)=>i?.c?`${n}:${i.c}${i.l}`:null).filter(Boolean)};}catch{return {invalid:true,raw};}};
+const status=()=>document.querySelector('#status').textContent=JSON.stringify({main:read(main),backup:read(backup)},null,2);
+const stash=()=>localStorage.setItem('cloudpost.qa.restore',JSON.stringify([localStorage.getItem(main),localStorage.getItem(backup)]));
+document.querySelector('#seed').onclick=()=>{const s=newGame(123);s.welcomed=true;const raw=encodeSave(s);localStorage.setItem(main,raw);localStorage.setItem(backup,raw);status();};
+document.querySelector('#corrupt-main').onclick=()=>{stash();localStorage.setItem(main,'{broken-main');status();};
+document.querySelector('#corrupt-both').onclick=()=>{stash();localStorage.setItem(main,'{broken-main');localStorage.setItem(backup,'{broken-backup');status();};
+document.querySelector('#recover').onclick=()=>{const pair=JSON.parse(localStorage.getItem('cloudpost.qa.restore'));if(pair)pair.forEach((v,i)=>v===null?localStorage.removeItem(i?backup:main):localStorage.setItem(i?backup:main,v));status();};
+document.querySelector('#read').onclick=status;status();
+</script></html>
