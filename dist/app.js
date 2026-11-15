@@ -78,7 +78,7 @@ function sound(kind) {
     });
   } catch{}
 }
-function act(fn,{keepSelection=false,quiet=false}={}) {
+function act(fn,{keepSelection=false,quiet=false,spawnFrom=null}={}) {
   if(readOnly){openModal(corruption?'corrupt':'conflict');return {ok:false};}
   const before=E.clone(state), result=fn(state);
   if(!result.ok){if(result.message)toast(result.message);return result;}
@@ -86,12 +86,57 @@ function act(fn,{keepSelection=false,quiet=false}={}) {
   if(!keepSelection)selected=null;
   render();scheduleSave();
   if(!quiet)sound(result.kind);
-  if(result.index!==undefined&&['merge','spawn'].includes(result.kind)) {
+  if(result.kind==='spawn'&&spawnFrom!==null)animateSpawn(spawnFrom,result.index);
+  else if(result.index!==undefined&&['merge','spawn'].includes(result.kind)) {
     const cell=cells[result.index];cell.classList.remove('burst','spawn-pop');
     requestAnimationFrame(()=>cell.classList.add(result.kind==='merge'?'burst':'spawn-pop'));
   }
   return result;
 }
+// Keep game state immediate; only the visual item travels to its reserved cell.
+const flights=new Map();
+function reducedMotion(){return state.settings.reducedMotion||matchMedia('(prefers-reduced-motion: reduce)').matches;}
+function produce(id) {
+  const generator=GENERATORS.find(g=>g.id===id);
+  return act(s=>E.spawn(s,id),{keepSelection:true,spawnFrom:generator?.slot??null});
+}
+function animateSpawn(from,to) {
+  if(reducedMotion())return;
+  const source=cells[from],target=cells[to],item=state.board[to];
+  if(!source||!target||!item?.c||!target.animate)return;
+  const a=source.getBoundingClientRect(),b=target.getBoundingClientRect();
+  if(!a.width||!b.width)return;
+  const flyer=document.createElement('div');
+  flyer.className='spawn-flight';flyer.setAttribute('aria-hidden','true');
+  flyer.innerHTML=itemArt(item.c,item.l);
+  // Anchor inside the destination so scrolling moves the entire trajectory with the board.
+  target.classList.remove('burst','spawn-pop');
+  target.append(flyer);target.classList.add('spawn-pending');
+  const dx=a.left+a.width/2-b.left-b.width/2,dy=a.top+a.height/2-b.top-b.height/2;
+  const lift=Math.min(90,35+Math.hypot(dx,dy)*.18);
+  const frames=Array.from({length:21},(_,i)=>{
+    const t=i/20,x=dx*(1-t),y=dy*(1-t)-4*lift*t*(1-t),scale=.65+.35*t;
+    return {transform:`translate(${x}px,${y}px) scale(${scale}) rotate(${Math.sin(Math.PI*t)*-12}deg)`};
+  });
+  const animation=flyer.animate(frames,{duration:420,easing:'linear'});
+  const flight={item,finish(){
+    if(flights.get(to)!==flight)return;
+    flights.delete(to);animation.cancel();flyer.remove();target.classList.remove('spawn-pending');
+  }};
+  flights.set(to,flight);
+  animation.onfinish=()=>{flight.finish();if(!reducedMotion())target.animate([
+    {transform:'scale(1.08,.92)'},{transform:'scale(.97,1.03)'},{transform:'scale(1)'}
+  ],{duration:180,easing:'ease-out'});};
+  animation.oncancel=()=>flight.finish();
+}
+function syncFlights() {
+  for(const [index,flight] of flights)if(state.board[index]!==flight.item||reducedMotion())flight.finish();
+}
+function routeProject(item) {
+  const project=E.currentProject(state);
+  return item?.c&&project?.req.some(([c,l])=>item.c===c&&item.l===l)?project:null;
+}
+
 function undo() {
   if(readOnly)return toast('请先载入最新存档');
   if(!history.length)return toast('还没有可以撤销的操作');
@@ -134,15 +179,20 @@ function renderIsland() {
   panel.dataset.chapter=E.chapterOf(state);panel.dataset.built=state.built;
 }
 function renderBoard() {
+  syncFlights();
   const chosen=selected!==null?state.board[selected]:null;
   cells.forEach((cell,index)=>{
     const item=state.board[index];const g=item?.g?GENERATORS.find(g=>g.id===item.g):null;
-    const locked=g&&!E.unlocked(state,g),signature=JSON.stringify([item,g?state.gens[g.id]:null,locked]);
+    const project=routeProject(item);
+    const locked=g&&!E.unlocked(state,g),signature=JSON.stringify([item,g?state.gens[g.id]:null,locked,project?.name]);
     if(cell.dataset.signature!==signature){
+      flights.get(index)?.finish();
       cell.dataset.signature=signature;
-      cell.innerHTML=g?`${generatorArt(g.id)}${locked?icon('lock'):`<span class="gen-level">Lv.${state.gens[g.id]}</span><span class="gen-plus">+</span>`}`:item?`${itemArt(item.c,item.l)}<span class="item-level">${item.l}</span>`:'';
-      cell.setAttribute('aria-label',g?`${g.name}，${locked?'尚未解锁':'点击生成物品'}`:item?`${itemName(item)}，${item.l} 级，位置 ${index+1}`:`空格 ${index+1}`);
+      cell.innerHTML=g?`${generatorArt(g.id)}${locked?icon('lock'):`<span class="gen-level">Lv.${state.gens[g.id]}</span><span class="gen-plus">+</span>`}`:item?`${itemArt(item.c,item.l)}<span class="item-level">${item.l}</span>${project?'<span class="route-badge" aria-hidden="true">航线</span>':''}`:'';
+      cell.setAttribute('aria-label',g?`${g.name}，${locked?'尚未解锁':'点击生成物品'}`:item?`${itemName(item)}，${item.l} 级，位置 ${index+1}${project?`，航线建设「${project.name}」需要`:""}`:`空格 ${index+1}`);
     }
+    cell.classList.toggle('route-needed',!!project);
+    cell.title=project?`航线建设「${project.name}」需要此物品`:'';
     cell.classList.toggle('empty',!item);cell.classList.toggle('generator',!!g);cell.classList.toggle('locked',!!locked);
     cell.classList.toggle('selected',index===selected);
     cell.classList.toggle('match',!!(chosen?.c&&item?.c===chosen.c&&item.l===chosen.l&&chosen.l<7&&index!==selected));
@@ -156,7 +206,7 @@ function renderSelection() {
   const i=selected!==null?state.board[selected]:null;
   if(!i){$('#selection-bar').innerHTML=`<div class="empty-selection">${icon('leaf')}<span>不必着急，先从一封信开始。<br>点绿色生成器制作物品，再拖动或点选合成。</span></div>`;return;}
   if(i.g){const g=GENERATORS.find(g=>g.id===i.g),available=E.unlocked(state,g);$('#selection-bar').innerHTML=`${generatorArt(g.id)}<div class="selected-description"><strong>${g.name} · ${available?`Lv.${state.gens[g.id]}`:'未解锁'}</strong><small>${available?`产出${CHAINS[g.chains[0]].name}与${CHAINS[g.chains[1]].name} · 无需等待`:`抵达${CHAPTERS[g.chapter].name}后开启`}</small></div><div class="selection-actions"><button data-action="workshop" aria-label="查看生成器升级">${icon('info')}</button>${available?`<button data-action="produce" data-id="${g.id}" aria-label="再生成一个物品">${icon('tidy')}</button>`:''}</div>`;return;}
-  $('#selection-bar').innerHTML=`${itemArt(i.c,i.l)}<div class="selected-description"><strong>${itemName(i)} <span style="color:#92967e;font-size:10px">Lv.${i.l}</span></strong><small>${i.l===7?'已到最高等级，值得珍藏':'点击相同物品合成，或点击空格移动'}</small></div><div class="selection-actions"><button data-action="item" data-chain="${i.c}" data-level="${i.l}" aria-label="查看物品合成路线">${icon('info')}</button><button data-action="store" aria-label="将选中物品存入仓库">${icon('bag')}</button><button data-action="recycle" aria-label="回收选中物品">${icon('recycle')}</button></div>`;
+  $('#selection-bar').innerHTML=`${itemArt(i.c,i.l)}<div class="selected-description"><strong>${itemName(i)} <span style="color:#92967e;font-size:10px">Lv.${i.l}</span></strong><small>${routeProject(i)?`航线建设「${routeProject(i).name}」需要此物品`:i.l===7?'已到最高等级，值得珍藏':'点击相同物品合成，或点击空格移动'}</small></div><div class="selection-actions"><button data-action="item" data-chain="${i.c}" data-level="${i.l}" aria-label="查看物品合成路线">${icon('info')}</button><button data-action="store" aria-label="将选中物品存入仓库">${icon('bag')}</button><button data-action="recycle" aria-label="回收选中物品">${icon('recycle')}</button></div>`;
 }
 function claimable(){return ACHIEVEMENTS.filter(a=>!state.claimed.includes(a.id)&&E.achievementProgress(state,a)>=a.goal).length;}
 function render() {
@@ -170,7 +220,7 @@ function render() {
 }
 function choose(index) {
   const intent=E.tapIntent(state,selected,index);
-  if(intent.kind==='generate'){selected=index;act(s=>E.spawn(s,intent.id),{keepSelection:true});renderBoard();renderSelection();return;}
+  if(intent.kind==='generate'){selected=index;produce(intent.id);renderBoard();renderSelection();return;}
   if(intent.kind==='move') {
     const result=act(s=>E.move(s,intent.from,index));
     if(result.ok){selected=index;renderBoard();renderSelection();}
@@ -242,7 +292,7 @@ document.addEventListener('click',async event=>{
   if(action==='welcome'){state.welcomed=true;scheduleSave();closeModal();toast('试试把中间的两张信纸合在一起吧');return;}
   if(action==='undo'){undo();return;}
   if(action==='tidy'){const r=act(E.tidy);if(r.ok)toast('已按系列整理，合成进度都保留着');return;}
-  if(action==='produce'){act(s=>E.spawn(s,button.dataset.id),{keepSelection:true});return;}
+  if(action==='produce'){produce(button.dataset.id);return;}
   if(action==='store'&&selected!==null){const r=act(s=>E.storeItem(s,selected));if(r.ok)toast('已收进仓库，交单时可以直接取用');return;}
   if(action==='retrieve'){act(s=>E.retrieve(s,Number(button.dataset.index)));return;}
   if(action==='expand'){const r=act(E.expand);if(r.ok)toast('仓库又宽敞了一点，新增 4 个位置');return;}
@@ -281,7 +331,7 @@ document.addEventListener('click',async event=>{
 document.addEventListener('change',event=>{
   const key=event.target.dataset.setting;
   if(key){if(readOnly){event.target.checked=state.settings[key];return;}
-    state.settings[key]=event.target.checked;document.body.classList.toggle('reduce-motion',state.settings.reducedMotion);scheduleSave();if(key==='sound'&&event.target.checked)sound('merge');}
+    state.settings[key]=event.target.checked;document.body.classList.toggle('reduce-motion',state.settings.reducedMotion);syncFlights();scheduleSave();if(key==='sound'&&event.target.checked)sound('merge');}
 });
 $('#import-file').addEventListener('change',async event=>{
   const file=event.target.files?.[0];event.target.value='';if(!file)return;
@@ -331,6 +381,14 @@ board.addEventListener('keydown',event=>{
   if(offsets[event.key]){event.preventDefault();cells[Math.max(0,Math.min(SIZE-1,index+offsets[event.key]))].focus();}
   if(event.key==='Escape'){selected=null;renderBoard();renderSelection();}
 });
+// Preserve single-finger scrolling and board dragging while blocking browser zoom gestures.
+document.addEventListener('wheel',event=>{if(event.ctrlKey||event.metaKey)event.preventDefault();},{passive:false});
+document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&['+','=','-','0'].includes(event.key))event.preventDefault();});
+for(const type of ['gesturestart','gesturechange','gestureend'])document.addEventListener(type,event=>event.preventDefault(),{passive:false});
+document.addEventListener('touchmove',event=>{if(event.touches.length>1)event.preventDefault();},{passive:false});
+document.addEventListener('dblclick',event=>event.preventDefault());
+document.addEventListener('selectstart',event=>{if(!event.target.closest('input,textarea,[contenteditable="true"]'))event.preventDefault();});
+window.addEventListener('resize',()=>{for(const flight of flights.values())flight.finish();});
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;});
 function offlineStatus() {
   $('#mobile-offline-status').textContent=offlineReady?(navigator.onLine?'离线就绪':'离线中'):'准备离线';
@@ -351,3 +409,4 @@ else if(!state.welcomed)openModal('welcome');
 else saveStatus(saveAvailable?'进度已保存在本机':'请导出存档，自动保存不可用',!saveAvailable);
 if(loadMessage)setTimeout(()=>toast(loadMessage),700);
 if(!readOnly)scheduleSave();
+
