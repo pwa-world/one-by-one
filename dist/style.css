@@ -49,3 +49,10 @@ input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:tex
 .merge-spark{position:absolute;left:50%;top:50%;font:18px/1 var(--sans);color:#c68a2f;text-shadow:0 0 3px #fff8de}
 .merge-spark:nth-child(even){color:#729c78;font-size:14px}
 .merge-level{position:absolute;left:50%;top:-8px;white-space:nowrap;padding:3px 7px;border-radius:8px;background:#fff8e8;color:#796033;box-shadow:0 2px 8px #76613a26;font:600 11px/1.2 var(--sans);z-index:3}
+
+.update-banner{position:fixed;z-index:45;left:50%;bottom:24px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;width:max-content;max-width:calc(100% - 24px);padding:10px 12px;border:1px solid #b9c8a6;border-radius:12px;background:#faf7ec;box-shadow:0 5px 24px #42544026;font:13px var(--sans)}
+.update-banner[hidden]{display:none}
+.update-banner button{min-height:44px;white-space:nowrap}
+@media(max-width:760px){.update-banner{bottom:calc(76px + env(safe-area-inset-bottom));gap:8px;font-size:12px;padding:8px 10px}.update-banner button{padding:6px 10px}}
+.update-banner:not([hidden])~.toast{bottom:108px}
+@media(max-width:760px){.update-banner:not([hidden])~.toast{bottom:calc(160px + env(safe-area-inset-bottom))}}

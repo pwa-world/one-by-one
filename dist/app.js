@@ -5,6 +5,7 @@ import {SAVE_KEY as KEY,BACKUP_KEY as BACKUP,persistState} from './save-store.js
 const $=selector=>document.querySelector(selector);
 let state, lastStored=null, saveTimer, maxSaveTimer, loadMessage='', saveAvailable=true, readOnly=false, corruption=false;
 let selected=null, history=[], currentView='', modalData=null, toastTimer, installPrompt=null, offlineReady=false, mobileTab='desk';
+let updateVersion='',dismissedUpdate='',checkingVersion=0;
 let audioContext, islandSignature='', orderSignature='', pendingImport=null;
 const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 try {
@@ -46,15 +47,17 @@ function conflict() {
 }
 function persist(force=false) {
   clearTimeout(saveTimer);clearTimeout(maxSaveTimer);saveTimer=maxSaveTimer=null;
-  if(readOnly&&!force)return;
+  if(readOnly&&!force)return false;
   try {
     const result=persistState(localStorage,state,{expected:lastStored,force});
-    if(result.conflict){conflict();return;}
+    if(result.conflict){conflict();return false;}
     lastStored=result.raw;saveAvailable=true;
     saveStatus(result.backupFailed?'进度已保存，备份空间不足':'进度已保存在本机',result.backupFailed);
+    return true;
   } catch {
     saveAvailable=false;saveStatus('自动保存失败，请导出存档',true);
     toast('本机存储不可用或已满，请到设置导出存档。');
+    return false;
   }
 }
 function scheduleSave(){if(readOnly)return;saveStatus('正在保存…');clearTimeout(saveTimer);saveTimer=setTimeout(persist,280);maxSaveTimer ||= setTimeout(persist,1800);}
@@ -310,7 +313,7 @@ function renderModal() {
   else if(currentView==='ending')html=`<div class="intro-art">${scene(5,18)}</div><div class="ending-stamp">远方有回音</div><p class="letter-text">${CHAPTERS[5].projects[2].text}</p><p class="tip">全部 6 条航线、18 项建设已经完成。居民委托会一直继续，你也可以收藏全部 84 种物品，完成剩余的小成就。</p><button class="primary-button full-width" data-action="close">邮局明天，也照常营业</button>`;
   else if(currentView==='recycle') {const item=state.board[modalData];html=`<div class="item-detail-hero">${itemArt(item.c,item.l)}<div><h3>${itemName(item)}</h3><p>回收后获得 ${Math.max(1,Math.floor(E.valueOf(item)/2))} 零件</p></div></div><p>零件可用于升级生成器。回收后可以通过撤销按钮恢复物品。</p><div class="actions"><button class="primary-button" data-action="confirm-recycle" data-index="${modalData}">回收物品</button><button class="secondary-button" data-action="close">再留一会儿</button></div>`;}
   else if(currentView==='reroll')html=`<p class="lead">这份委托可以留给下一位信使。</p><p>免费换一份新的委托，已有的物品都会保留。更换不会获得奖励，也不会扣除资源。</p><div class="actions"><button class="primary-button" data-action="confirm-reroll" data-slot="${modalData}">换一份委托</button><button class="secondary-button" data-action="close">保留这份</button></div>`;
-  else if(currentView==='settings')html=`<div class="setting-row"><div><strong>轻轻的合成音效</strong><p>由设备生成，无需下载音频</p></div><input class="toggle" type="checkbox" data-setting="sound" aria-label="合成音效" ${state.settings.sound?'checked':''}></div><div class="setting-row"><div><strong>减少动态效果</strong><p>让合成与界面切换更安静</p></div><input class="toggle" type="checkbox" data-setting="reducedMotion" aria-label="减少动态效果" ${state.settings.reducedMotion?'checked':''}></div><section class="settings-section"><h3>把回忆，好好留住</h3><p>进度自动保存在当前浏览器。换设备、换浏览器或清理网站数据前，记得导出存档。</p><div class="actions"><button class="primary-button" data-action="export">${icon('download')} 导出存档</button><button class="secondary-button" data-action="import">导入存档</button><button class="secondary-button" data-action="backup">恢复上次备份</button></div><p class="storage-info">${saveAvailable?'本机自动保存已启用':'自动保存暂不可用，请导出存档'} · 存档版本 1<br>最近保存：${new Date(state.savedAt).toLocaleString('zh-CN')}</p></section><hr><h3>把邮局放进口袋</h3><p id="offline-detail">${offlineReady?'离线资源已准备好。断开网络后仍可生产、合成、建设和保存。':'正在准备离线资源，请在联网状态下稍等片刻。'}</p><div class="actions"><button class="secondary-button" data-action="install">${icon('download')} 安装到设备</button><button class="secondary-button" data-action="help">玩法指南</button></div><p class="muted-note">iPhone / iPad：用 Safari 打开，点“分享 → 添加到主屏幕”。其他设备可使用浏览器菜单里的安装选项。首次访问需加载完整资源。</p><hr><button class="secondary-button danger-button" data-action="reset">重新开始旅程</button><p class="muted-note">云海邮局 v1.0.4 · 一封信，一个温柔的小世界。</p>`;
+  else if(currentView==='settings')html=`<div class="setting-row"><div><strong>轻轻的合成音效</strong><p>由设备生成，无需下载音频</p></div><input class="toggle" type="checkbox" data-setting="sound" aria-label="合成音效" ${state.settings.sound?'checked':''}></div><div class="setting-row"><div><strong>减少动态效果</strong><p>让合成与界面切换更安静</p></div><input class="toggle" type="checkbox" data-setting="reducedMotion" aria-label="减少动态效果" ${state.settings.reducedMotion?'checked':''}></div><section class="settings-section"><h3>把回忆，好好留住</h3><p>进度自动保存在当前浏览器。换设备、换浏览器或清理网站数据前，记得导出存档。</p><div class="actions"><button class="primary-button" data-action="export">${icon('download')} 导出存档</button><button class="secondary-button" data-action="import">导入存档</button><button class="secondary-button" data-action="backup">恢复上次备份</button></div><p class="storage-info">${saveAvailable?'本机自动保存已启用':'自动保存暂不可用，请导出存档'} · 存档版本 1<br>最近保存：${new Date(state.savedAt).toLocaleString('zh-CN')}</p></section><hr><h3>把邮局放进口袋</h3>${updateVersion?'<p class="tip">新版本已就绪，下次打开即可使用。</p><button class="primary-button" data-action="apply-update">保存进度并更新</button>':''}<p id="offline-detail">${offlineReady?'离线资源已准备好。断开网络后仍可生产、合成、建设和保存。':'正在准备离线资源，请在联网状态下稍等片刻。'}</p><div class="actions"><button class="secondary-button" data-action="install">${icon('download')} 安装到设备</button><button class="secondary-button" data-action="help">玩法指南</button></div><p class="muted-note">iPhone / iPad：用 Safari 打开，点“分享 → 添加到主屏幕”。其他设备可使用浏览器菜单里的安装选项。首次访问需加载完整资源。</p><hr><button class="secondary-button danger-button" data-action="reset">重新开始旅程</button><p class="muted-note">云海邮局 v1.0.4 · 一封信，一个温柔的小世界。</p>`;
   else if(currentView==='import')html=`<p class="lead">找到了一段云海旅程。</p><p>修复 ${pendingImport.built} / 18 项建设，完成 ${pendingImport.stats.orders} 份委托，收藏 ${pendingImport.discovered.length} 种物品。</p><p class="tip">载入后会替换当前进度，现有有效存档会保留为上次备份。也可以先导出当前进度。</p><div class="actions"><button class="primary-button" data-action="confirm-import">载入这份存档</button><button class="secondary-button" data-action="export">先导出当前进度</button><button class="secondary-button" data-action="close">取消</button></div>`;
   else if(currentView==='reset')html=`<p class="lead">每一次出发，都值得认真告别。</p><p>这会清空当前旅程。建议先导出存档，之后还可以回来。</p><input class="safety-confirm" id="reset-confirm" placeholder="输入“重新开始”确认" aria-label="输入重新开始确认"><div class="actions"><button class="secondary-button" data-action="export">导出存档</button><button class="secondary-button danger-button" data-action="confirm-reset">开始新的旅程</button></div>`;
   else if(currentView==='conflict')html=`<p class="lead">另一窗口保存了新的进度。</p><p>为避免相互覆盖，这个窗口暂时停止保存。请载入最新进度继续；也可以先导出这个窗口中的进度。</p><div class="actions"><button class="primary-button" data-action="reload">载入最新进度</button><button class="secondary-button" data-action="export">导出此窗口进度</button></div>`;
@@ -330,6 +333,13 @@ function showMobileTab(tab) {
 document.addEventListener('click',async event=>{
   const button=event.target.closest('[data-action]');if(!button||button.disabled)return;
   const action=button.dataset.action;
+  if(action==='apply-update'){
+    if(!updateVersion)return;
+    if(readOnly){openModal(corruption?'corrupt':'conflict');return;}
+    if(persist())location.reload();
+    return;
+  }
+  if(action==='dismiss-update'){dismissedUpdate=updateVersion;$('#update-banner').hidden=true;return;}
   if(action==='close'){closeModal();return;}
   if(['storage','collection','workshop','routes','journal','achievements','settings','help','reset','ending'].includes(action)){openModal(action);return;}
   if(action==='item'){openModal('item',{c:button.dataset.chain,l:Number(button.dataset.level)});return;}
@@ -434,7 +444,10 @@ document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&[
 for(const type of ['gesturestart','gesturechange','gestureend'])document.addEventListener(type,event=>event.preventDefault(),{passive:false});
 document.addEventListener('touchmove',event=>{if(event.touches.length>1)event.preventDefault();},{passive:false});
 document.addEventListener('dblclick',event=>event.preventDefault());
-document.addEventListener('selectstart',event=>{if(!event.target.closest('input,textarea,[contenteditable="true"]'))event.preventDefault();});
+document.addEventListener('selectstart',event=>{
+  const target=event.target instanceof Element?event.target:event.target.parentElement;
+  if(!target?.closest('input,textarea,[contenteditable="true"]'))event.preventDefault();
+});
 window.addEventListener('resize',()=>{for(const flight of flights.values())flight.finish();for(const effect of merges.values())effect.finish();});
 matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',syncFlights);
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;});
@@ -443,11 +456,40 @@ function offlineStatus() {
   $('#offline-status').textContent=offlineReady?`${navigator.onLine?'离线已就绪':'正在离线游玩'} · ${saveAvailable?'本机自动存档':'请手动导出存档'}`:'本机存档 · 离线资源尚未就绪';
   if(currentView==='settings')renderModal();
 }
+// Compare the active worker with the HTML actually loaded, including an update that
+// finished before this page registered its listeners. First installation is the same version.
+function checkUpdateVersion() {
+  const worker=navigator.serviceWorker.controller;
+  if(!worker)return;
+  const request=++checkingVersion,channel=new MessageChannel();
+  const timeout=setTimeout(()=>{channel.port1.close();channel.port2.close();},4000);
+  channel.port1.onmessage=event=>{
+    clearTimeout(timeout);channel.port1.close();channel.port2.close();
+    if(request!==checkingVersion||worker!==navigator.serviceWorker.controller)return;
+    const version=event.data?.version;
+    if(event.data?.type!=='SHELL_VERSION'||typeof version!=='string')return;
+    updateVersion=version!==$('meta[name="shell-version"]').content?version:'';
+    $('#update-banner').hidden=!updateVersion||dismissedUpdate===updateVersion;
+    offlineReady=true;offlineStatus();
+  };
+  worker.postMessage({type:'GET_SHELL_VERSION'},[channel.port2]);
+}
 if('serviceWorker' in navigator && (location.protocol==='https:'||['localhost','127.0.0.1'].includes(location.hostname))) {
-  navigator.serviceWorker.register('./sw.js').then(async()=>{
+  navigator.serviceWorker.addEventListener('controllerchange',checkUpdateVersion);
+  navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(async registration=>{
     await navigator.serviceWorker.ready;
     const cached=await caches.match(new URL('./index.html',location.href).href);
-    offlineReady=!!cached;offlineStatus();
+    offlineReady=!!cached;offlineStatus();checkUpdateVersion();
+    let lastCheck=0;
+    const check=()=>{
+      if(document.hidden||!navigator.onLine)return;
+      checkUpdateVersion();
+      if(Date.now()-lastCheck<60000)return;
+      lastCheck=Date.now();registration.update().catch(()=>{});
+    };
+    document.addEventListener('visibilitychange',check);
+    window.addEventListener('online',check);
+    setInterval(check,5*60*1000);
   }).catch(()=>{offlineStatus();toast('离线资源暂未准备好，请联网后重新打开邮局');});
 } else {$('#offline-status').textContent='请通过 localhost 或 HTTPS 打开，以启用离线安装';}
 window.addEventListener('online',offlineStatus);window.addEventListener('offline',offlineStatus);
