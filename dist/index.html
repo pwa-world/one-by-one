@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="shell-version" content="cloudpost-shell-v1.0.4-r5">
   <meta name="theme-color" content="#f5f0e4">
   <meta name="description" content="在云海之上经营一座小小邮局。随心合成，寄出牵挂，让远方有回音。无需体力，支持离线游玩。">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -42,6 +43,7 @@
     <footer class="site-footer"><span>在云海之上，慢慢生活。</span><span id="offline-status">本机存档 · 正在准备离线资源</span><button data-action="help">新任邮局长指南</button></footer>
   </div>
   <nav class="mobile-nav" aria-label="游戏导航"><button class="active" data-action="tab" data-tab="desk">工作台</button><button data-action="tab" data-tab="island">航线</button><button data-action="journal">手帐</button><button data-action="settings">设置</button></nav>
+  <div id="update-banner" class="update-banner" role="status" aria-live="polite" hidden><span>新版本已就绪</span><button class="primary-button" data-action="apply-update">点击更新</button><button class="secondary-button" data-action="dismiss-update">稍后</button></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <dialog id="modal" aria-labelledby="modal-title"><div class="modal-header"><h2 id="modal-title"></h2><button class="icon-button" data-action="close" aria-label="关闭窗口"></button></div><div id="modal-body" class="modal-body"></div></dialog>
   <input type="file" id="import-file" accept="application/json,.json" hidden>

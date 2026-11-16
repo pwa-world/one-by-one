@@ -17,7 +17,7 @@ function worker({network=true,failInstall=false}={}) {
   vm.runInNewContext(code,{self,caches,URL,Request,fetch:async()=>{calls.network++;if(!network)throw new Error('offline');return 'network';}});
   const lifecycle=name=>{let promise;listeners[name]({waitUntil:p=>promise=p});return promise;};
   const request=(url,mode='cors',method='GET')=>{let response;listeners.fetch({request:{url,mode,method},respondWith:p=>response=p});return response;};
-  return {calls,entries,stores,lifecycle,request};
+  return {calls,entries,stores,lifecycle,request,message:event=>listeners.message(event)};
 }
 test('install pre-caches full shell, then activation cleans only this games old caches',async()=>{
   const w=worker();await w.lifecycle('install');assert.equal(w.entries.size,14);assert.equal(w.calls.skipped,1);
@@ -49,4 +49,16 @@ test('every static module dependency is pre-cached, including item illustrations
       assert.ok(w.entries.has(new URL(dependency,url).href),`${dependency} imported by ${url} must work offline`);
     }
   }
+});
+
+
+test('active worker reports the same shell version as shipped HTML',async()=>{
+  const w=worker();await w.lifecycle('install');await w.lifecycle('activate');
+  let reply;w.message({data:{type:'GET_SHELL_VERSION'},ports:[{postMessage:data=>reply=data}]});
+  const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');
+  assert.equal(reply.type,'SHELL_VERSION');
+  assert.equal(reply.version,html.match(/name="shell-version" content="([^"]+)"/)[1]);
+  reply=null;w.message({data:{type:'unrelated'},ports:[{postMessage:data=>reply=data}]});
+  assert.equal(reply,null);
+  assert.doesNotThrow(()=>w.message({data:{type:'GET_SHELL_VERSION'}}));
 });
