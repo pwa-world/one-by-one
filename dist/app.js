@@ -78,8 +78,9 @@ function sound(kind) {
     });
   } catch{}
 }
-function act(fn,{keepSelection=false,quiet=false,spawnFrom=null}={}) {
+function act(fn,{keepSelection=false,quiet=false,spawnFrom=null,mergeFrom=null,mergePoint=null}={}) {
   if(readOnly){openModal(corruption?'corrupt':'conflict');return {ok:false};}
+  const sourceRect=mergeFrom!==null?cells[mergeFrom]?.getBoundingClientRect():null;
   const before=E.clone(state), result=fn(state);
   if(!result.ok){if(result.message)toast(result.message);return result;}
   history.push(before);if(history.length>20)history.shift();
@@ -87,14 +88,15 @@ function act(fn,{keepSelection=false,quiet=false,spawnFrom=null}={}) {
   render();scheduleSave();
   if(!quiet)sound(result.kind);
   if(result.kind==='spawn'&&spawnFrom!==null)animateSpawn(spawnFrom,result.index);
-  else if(result.index!==undefined&&['merge','spawn'].includes(result.kind)) {
+  else if(result.kind==='merge')animateMerge(result.index,before.board[result.index],sourceRect,mergePoint);
+  else if(result.index!==undefined&&result.kind==='spawn') {
     const cell=cells[result.index];cell.classList.remove('burst','spawn-pop');
-    requestAnimationFrame(()=>cell.classList.add(result.kind==='merge'?'burst':'spawn-pop'));
+    requestAnimationFrame(()=>cell.classList.add('spawn-pop'));
   }
   return result;
 }
 // Keep game state immediate; only the visual item travels to its reserved cell.
-const flights=new Map();
+const flights=new Map(),merges=new Map();
 function reducedMotion(){return state.settings.reducedMotion||matchMedia('(prefers-reduced-motion: reduce)').matches;}
 function produce(id) {
   const generator=GENERATORS.find(g=>g.id===id);
@@ -129,7 +131,52 @@ function animateSpawn(from,to) {
   ],{duration:180,easing:'ease-out'});};
   animation.oncancel=()=>flight.finish();
 }
+// All merge visuals belong to the resulting item, so undo/move/another merge can cancel them.
+function animateMerge(index,ingredient,sourceRect,point) {
+  if(reducedMotion()||!ingredient?.c)return;
+  const cell=cells[index],item=state.board[index],art=cell.querySelector(':scope > .item-art');
+  if(!art?.animate)return;
+  const rect=cell.getBoundingClientRect();if(!rect.width)return;
+  merges.get(index)?.finish();
+  cell.classList.remove('burst','spawn-pop');cell.classList.add('merge-active');
+  const layer=document.createElement('span');layer.className='merge-effects';layer.setAttribute('aria-hidden','true');
+  layer.innerHTML=`<span class="merge-ring"></span><span class="merge-flash"></span><span class="merge-level">Lv.${item.l} ↑</span>`;
+  cell.append(layer);
+  const animations=[];
+  const play=(node,frames,options)=>{const a=node.animate(frames,{fill:'both',...options});animations.push(a);return a;};
+  const effect={item,finish(){
+    if(merges.get(index)!==effect)return;
+    merges.delete(index);for(const a of animations)a.cancel();layer.remove();cell.classList.remove('merge-active');
+  }};
+  merges.set(index,effect);
+  const cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+  const dx=(point?.x??(sourceRect?sourceRect.left+sourceRect.width/2:cx))-cx;
+  const dy=(point?.y??(sourceRect?sourceRect.top+sourceRect.height/2:cy))-cy;
+  for(const [x,y] of [[dx,dy],[0,0]]){
+    const incoming=document.createElement('span');incoming.className='merge-ingredient';incoming.innerHTML=itemArt(ingredient.c,ingredient.l);layer.append(incoming);
+    play(incoming,[{transform:`translate(${x}px,${y}px) scale(1)`,opacity:1},{transform:'translate(0,0) scale(.35)',opacity:0}],{duration:140,easing:'cubic-bezier(.4,0,.8,.5)'});
+  }
+  play(art,[
+    {transform:'scale(.4)',opacity:0,offset:0},
+    {transform:'scale(.4)',opacity:0,offset:.19},
+    {transform:'scale(1.3,.84) rotate(-7deg)',opacity:1,offset:.4},
+    {transform:'scale(.91,1.15) rotate(4deg)',opacity:1,offset:.62},
+    {transform:'scale(1.05,.97) rotate(-2deg)',opacity:1,offset:.8},
+    {transform:'scale(1)',opacity:1}
+  ],{duration:560,easing:'ease-out'});
+  play(layer.querySelector('.merge-ring'),[{transform:'scale(.25)',opacity:.9},{transform:'scale(1.6)',opacity:0}],{duration:400,delay:100,easing:'ease-out'});
+  play(layer.querySelector('.merge-flash'),[{transform:'scale(.3)',opacity:0},{transform:'scale(1)',opacity:.8,offset:.3},{transform:'scale(1.4)',opacity:0}],{duration:280,delay:80});
+  const radius=rect.width*.8;
+  for(let n=0;n<8;n++){
+    const spark=document.createElement('span');spark.className='merge-spark';spark.textContent=n%2?'•':'✦';layer.append(spark);
+    const angle=n*Math.PI/4,x=Math.cos(angle)*radius,y=Math.sin(angle)*radius;
+    play(spark,[{transform:'translate(-50%,-50%) scale(.3)',opacity:0},{transform:`translate(calc(-50% + ${x*.35}px),calc(-50% + ${y*.35}px)) scale(1)`,opacity:1,offset:.2},{transform:`translate(calc(-50% + ${x}px),calc(-50% + ${y}px)) scale(.2) rotate(${n%2?90:160}deg)`,opacity:0}],{duration:430,delay:100,easing:'ease-out'});
+  }
+  const end=play(layer.querySelector('.merge-level'),[{transform:'translate(-50%,4px) scale(.8)',opacity:0},{transform:'translate(-50%,-4px) scale(1)',opacity:1,offset:.2},{transform:'translate(-50%,-20px) scale(1)',opacity:0}],{duration:550,delay:110,easing:'ease-out'});
+  end.onfinish=()=>effect.finish();
+}
 function syncFlights() {
+  for(const [index,effect] of merges)if(state.board[index]!==effect.item||reducedMotion())effect.finish();
   for(const [index,flight] of flights)if(state.board[index]!==flight.item||reducedMotion())flight.finish();
 }
 function routeProject(item) {
@@ -186,7 +233,7 @@ function renderBoard() {
     const project=routeProject(item);
     const locked=g&&!E.unlocked(state,g),signature=JSON.stringify([item,g?state.gens[g.id]:null,locked,project?.name]);
     if(cell.dataset.signature!==signature){
-      flights.get(index)?.finish();
+      flights.get(index)?.finish();merges.get(index)?.finish();
       cell.dataset.signature=signature;
       cell.innerHTML=g?`${generatorArt(g.id)}${locked?icon('lock'):`<span class="gen-level">Lv.${state.gens[g.id]}</span><span class="gen-plus">+</span>`}`:item?`${itemArt(item.c,item.l)}<span class="item-level">${item.l}</span>${project?'<span class="route-badge" aria-hidden="true">航线</span>':''}`:'';
       cell.setAttribute('aria-label',g?`${g.name}，${locked?'尚未解锁':'点击生成物品'}`:item?`${itemName(item)}，${item.l} 级，位置 ${index+1}${project?`，航线建设「${project.name}」需要`:""}`:`空格 ${index+1}`);
@@ -222,7 +269,7 @@ function choose(index) {
   const intent=E.tapIntent(state,selected,index);
   if(intent.kind==='generate'){selected=index;produce(intent.id);renderBoard();renderSelection();return;}
   if(intent.kind==='move') {
-    const result=act(s=>E.move(s,intent.from,index));
+    const result=act(s=>E.move(s,intent.from,index),{mergeFrom:intent.from});
     if(result.ok){selected=index;renderBoard();renderSelection();}
     return;
   }
@@ -368,7 +415,7 @@ board.addEventListener('pointerup',event=>{
   if(!drag||drag.pointer!==event.pointerId)return;
   const {index,started}=drag;
   if(started){suppressClickUntil=performance.now()+450;const target=document.elementFromPoint(event.clientX,event.clientY)?.closest('#board [data-cell]');
-    cleanupDrag();if(target){const to=Number(target.dataset.cell),r=act(s=>E.move(s,index,to));if(r.ok){selected=to;renderBoard();renderSelection();}}}
+    cleanupDrag();if(target){const to=Number(target.dataset.cell),r=act(s=>E.move(s,index,to),{mergeFrom:index,mergePoint:{x:event.clientX,y:event.clientY}});if(r.ok){selected=to;renderBoard();renderSelection();}}}
   else {cleanupDrag();suppressClickUntil=performance.now()+350;choose(index);}
 });
 board.addEventListener('pointercancel',cleanupDrag);
@@ -388,7 +435,8 @@ for(const type of ['gesturestart','gesturechange','gestureend'])document.addEven
 document.addEventListener('touchmove',event=>{if(event.touches.length>1)event.preventDefault();},{passive:false});
 document.addEventListener('dblclick',event=>event.preventDefault());
 document.addEventListener('selectstart',event=>{if(!event.target.closest('input,textarea,[contenteditable="true"]'))event.preventDefault();});
-window.addEventListener('resize',()=>{for(const flight of flights.values())flight.finish();});
+window.addEventListener('resize',()=>{for(const flight of flights.values())flight.finish();for(const effect of merges.values())effect.finish();});
+matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',syncFlights);
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;});
 function offlineStatus() {
   $('#mobile-offline-status').textContent=offlineReady?(navigator.onLine?'离线就绪':'离线中'):'准备离线';
