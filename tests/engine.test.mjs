@@ -112,3 +112,26 @@ test('every declared offline asset exists; manifest has suitable install icons',
   assert.equal(manifest.display,'standalone');assert.ok(manifest.icons.some(i=>i.sizes==='192x192'));assert.ok(manifest.icons.some(i=>i.sizes==='512x512'));
   assert.equal(Object.values(CHAINS).reduce((sum,c)=>sum+c.names.length,0),84);assert.equal(CHAPTERS.flatMap(c=>c.projects).length,18);
 });
+
+
+test('ready order hints use exact fulfillment allocation including storage and duplicates',()=>{
+  const s=E.newGame(10);clear(s);
+  const a=put(s,'paper',1),b=put(s,'paper',1),extra=put(s,'paper',1);
+  s.orders=[{req:[['paper',1],['paper',1],['wood',2]]},{req:[['paper',1]]},{req:[['paper',2]]}];
+  assert.deepEqual([...E.readyOrderItems(s)],[[a,[1]]]); // Partial orders and wrong levels do not qualify.
+  s.storage=[{c:'wood',l:2}];
+  const before=E.clone(s);
+  assert.deepEqual([...E.readyOrderItems(s)],[[a,[0,1]],[b,[0]]]);
+  assert.ok(!E.readyOrderItems(s).has(extra));
+  assert.deepEqual(s,before); // Hints never consume or reserve items.
+  E.consume(s,E.locateRequirements(s,s.orders[0].req));
+  assert.deepEqual([...E.readyOrderItems(s)],[[extra,[1]]]);
+  assert.deepEqual([...E.readyOrderItems(before)],[[a,[0,1]],[b,[0]]]);
+});
+test('ready order hints follow moves and omit storage-only requirements',()=>{
+  const s=E.newGame(11);clear(s);const a=put(s,'paper',2),target=s.board.indexOf(null);
+  s.orders=[{req:[['paper',2]]}];
+  E.move(s,a,target);assert.deepEqual([...E.readyOrderItems(s)],[[target,[0]]]);
+  E.storeItem(s,target);assert.equal(E.readyOrderItems(s).size,0);
+  assert.ok(E.locateRequirements(s,s.orders[0].req));
+});

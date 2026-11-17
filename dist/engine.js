@@ -78,6 +78,20 @@ export function locateRequirements(s, req) {
   }
   return locations;
 }
+// Use the same allocation as fulfillment: include storage and duplicate quantities.
+// Orders are alternatives; a board item may be usable by more than one ready order.
+export function readyOrderItems(s) {
+  const items=new Map();
+  s.orders.forEach((order,slot)=>{
+    const locations=locateRequirements(s,order.req);
+    if(!locations)return;
+    for(const {source,index} of locations)if(source==='board'){
+      if(!items.has(index))items.set(index,[]);
+      items.get(index).push(slot);
+    }
+  });
+  return items;
+}
 export function consume(s, locations) {
   locations.filter(x=>x.source==='board').forEach(x=>s.board[x.index]=null);
   locations.filter(x=>x.source==='storage').sort((a,b)=>b.index-a.index).forEach(x=>s.storage.splice(x.index,1));
@@ -170,3 +184,4 @@ export function decodeSave(text) {
   if(save?.format!=='cloudpost-save'||save.version!==VERSION||save.checksum!==checksum(JSON.stringify(save.data)))throw new Error('存档版本不受支持或文件已损坏，当前进度未被修改。');
   return validateState(save.data);
 }
+
