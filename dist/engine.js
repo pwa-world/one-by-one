@@ -78,17 +78,18 @@ export function locateRequirements(s, req) {
   }
   return locations;
 }
-// Use the same allocation as fulfillment: include storage and duplicate quantities.
-// Orders are alternatives; a board item may be usable by more than one ready order.
-export function readyOrderItems(s) {
+// Demand belongs to the current orders, regardless of when a board item appeared.
+// Mark every exact-level candidate; readiness is a separate whole-order check.
+export function orderItemHints(s) {
   const items=new Map();
   s.orders.forEach((order,slot)=>{
-    const locations=locateRequirements(s,order.req);
-    if(!locations)return;
-    for(const {source,index} of locations)if(source==='board'){
-      if(!items.has(index))items.set(index,[]);
-      items.get(index).push(slot);
-    }
+    const ready=!!locateRequirements(s,order.req);
+    s.board.forEach((item,index)=>{
+      if(!item?.c||!order.req.some(([c,l])=>item.c===c&&item.l===l))return;
+      if(!items.has(index))items.set(index,{slots:[],readySlots:[]});
+      const hint=items.get(index);hint.slots.push(slot);
+      if(ready)hint.readySlots.push(slot);
+    });
   });
   return items;
 }

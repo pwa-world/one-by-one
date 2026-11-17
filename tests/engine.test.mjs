@@ -114,24 +114,31 @@ test('every declared offline asset exists; manifest has suitable install icons',
 });
 
 
-test('ready order hints use exact fulfillment allocation including storage and duplicates',()=>{
-  const s=E.newGame(10);clear(s);
-  const a=put(s,'paper',1),b=put(s,'paper',1),extra=put(s,'paper',1);
-  s.orders=[{req:[['paper',1],['paper',1],['wood',2]]},{req:[['paper',1]]},{req:[['paper',2]]}];
-  assert.deepEqual([...E.readyOrderItems(s)],[[a,[1]]]); // Partial orders and wrong levels do not qualify.
-  s.storage=[{c:'wood',l:2}];
-  const before=E.clone(s);
-  assert.deepEqual([...E.readyOrderItems(s)],[[a,[0,1]],[b,[0]]]);
-  assert.ok(!E.readyOrderItems(s).has(extra));
-  assert.deepEqual(s,before); // Hints never consume or reserve items.
-  E.consume(s,E.locateRequirements(s,s.orders[0].req));
-  assert.deepEqual([...E.readyOrderItems(s)],[[extra,[1]]]);
-  assert.deepEqual([...E.readyOrderItems(before)],[[a,[0,1]],[b,[0]]]);
+test('existing items gain hints when a later order needs them, even before the whole order is ready',()=>{
+  const s=E.newGame(10);clear(s);const a=put(s,'paper',2),b=put(s,'paper',2),wrong=put(s,'paper',3);
+  s.orders=[{req:[['wood',2]]}];assert.equal(E.orderItemHints(s).size,0);
+  s.orders=[{req:[['paper',2],['wood',2]]}];const before=E.clone(s);
+  assert.deepEqual([...E.orderItemHints(s)],[[a,{slots:[0],readySlots:[]}],[b,{slots:[0],readySlots:[]}]]);
+  assert.ok(!E.orderItemHints(s).has(wrong));assert.deepEqual(s,before);
+  s.storage=[{c:'wood',l:2}];assert.deepEqual(E.orderItemHints(s).get(a),{slots:[0],readySlots:[0]});
+  assert.deepEqual(E.orderItemHints(s).get(b),{slots:[0],readySlots:[0]});
+  s.orders=[{req:[['wax',2]]}];assert.equal(E.orderItemHints(s).size,0);
 });
-test('ready order hints follow moves and omit storage-only requirements',()=>{
-  const s=E.newGame(11);clear(s);const a=put(s,'paper',2),target=s.board.indexOf(null);
-  s.orders=[{req:[['paper',2]]}];
-  E.move(s,a,target);assert.deepEqual([...E.readyOrderItems(s)],[[target,[0]]]);
-  E.storeItem(s,target);assert.equal(E.readyOrderItems(s).size,0);
-  assert.ok(E.locateRequirements(s,s.orders[0].req));
+test('duplicate requirements and shared orders do not hide existing candidates or falsely mark readiness',()=>{
+  const s=E.newGame(11);clear(s);const a=put(s,'paper',2);
+  s.orders=[{req:[['paper',2],['paper',2]]},{req:[['paper',2]]}];
+  assert.deepEqual(E.orderItemHints(s).get(a),{slots:[0,1],readySlots:[1]});
+  s.storage=[{c:'paper',l:2}];assert.deepEqual(E.orderItemHints(s).get(a),{slots:[0,1],readySlots:[0,1]});
+  const target=s.board.indexOf(null);E.move(s,a,target);assert.ok(!E.orderItemHints(s).has(a));assert.ok(E.orderItemHints(s).has(target));
+  E.storeItem(s,target);assert.equal(E.orderItemHints(s).size,0);
+});
+test('rerolling after items exist refreshes their demand without modifying the board',()=>{
+  const s=E.newGame(123);clear(s);
+  const next=E.clone(s);E.reroll(next,1);const [c,l]=next.orders[1].req[0],a=put(s,c,l);
+  s.orders=s.orders.map(o=>({...o,req:[['paper',7]]}));
+  assert.equal(E.orderItemHints(s).size,0);const before=E.clone(s);
+  E.reroll(s,1);assert.ok(E.orderItemHints(s).get(a)?.slots.includes(1));
+  assert.deepEqual(s.board,before.board);assert.equal(E.locateRequirements(s,s.orders[1].req),null);
+  assert.equal(E.orderItemHints(s).get(a).readySlots.length,0);
+  assert.equal(E.orderItemHints(before).size,0);
 });
