@@ -230,19 +230,22 @@ function renderIsland() {
 }
 function renderBoard() {
   syncFlights();
-  const chosen=selected!==null?state.board[selected]:null;
+  const chosen=selected!==null?state.board[selected]:null,readyItems=E.readyOrderItems(state);
   cells.forEach((cell,index)=>{
     const item=state.board[index];const g=item?.g?GENERATORS.find(g=>g.id===item.g):null;
-    const project=routeProject(item);
-    const locked=g&&!E.unlocked(state,g),signature=JSON.stringify([item,g?state.gens[g.id]:null,locked,project?.name]);
+    const project=routeProject(item),orders=readyItems.get(index)||[];
+    const orderHint=orders.length?`可提交${orders.map(slot=>CUSTOMERS[state.orders[slot].customer][0]).join('、')}的委托`:'';
+    const hints=[orderHint,project?`航线建设「${project.name}」需要此物品`:''].filter(Boolean).join('；');
+    const locked=g&&!E.unlocked(state,g),signature=JSON.stringify([item,g?state.gens[g.id]:null,locked,project?.name,orderHint]);
     if(cell.dataset.signature!==signature){
       flights.get(index)?.finish();merges.get(index)?.finish();
       cell.dataset.signature=signature;
-      cell.innerHTML=g?`${generatorArt(g.id)}${locked?icon('lock'):`<span class="gen-level">Lv.${state.gens[g.id]}</span><span class="gen-plus">+</span>`}`:item?`${itemArt(item.c,item.l)}<span class="item-level">${item.l}</span>${project?'<span class="route-badge" aria-hidden="true">航线</span>':''}`:'';
-      cell.setAttribute('aria-label',g?`${g.name}，${locked?'尚未解锁':'点击生成物品'}`:item?`${itemName(item)}，${item.l} 级，位置 ${index+1}${project?`，航线建设「${project.name}」需要`:""}`:`空格 ${index+1}`);
+      cell.innerHTML=g?`${generatorArt(g.id)}${locked?icon('lock'):`<span class="gen-level">Lv.${state.gens[g.id]}</span><span class="gen-plus">+</span>`}`:item?`${itemArt(item.c,item.l)}<span class="item-level">${item.l}</span>${project?'<span class="route-badge" aria-hidden="true">航线</span>':''}${orders.length?'<span class="order-badge" aria-hidden="true">✓</span>':''}`:'';
+      cell.setAttribute('aria-label',g?`${g.name}，${locked?'尚未解锁':'点击生成物品'}`:item?`${itemName(item)}，${item.l} 级，位置 ${index+1}${hints?`，${hints}`:""}`:`空格 ${index+1}`);
     }
     cell.classList.toggle('route-needed',!!project);
-    cell.title=project?`航线建设「${project.name}」需要此物品`:'';
+    cell.classList.toggle('order-ready',orders.length>0);
+    cell.title=hints;
     cell.classList.toggle('empty',!item);cell.classList.toggle('generator',!!g);cell.classList.toggle('locked',!!locked);
     cell.classList.toggle('selected',index===selected);
     cell.classList.toggle('match',!!(chosen?.c&&item?.c===chosen.c&&item.l===chosen.l&&chosen.l<7&&index!==selected));
@@ -256,7 +259,9 @@ function renderSelection() {
   const i=selected!==null?state.board[selected]:null;
   if(!i){$('#selection-bar').innerHTML=`<div class="empty-selection">${icon('leaf')}<span>不必着急，先从一封信开始。<br>点绿色生成器制作物品，再拖动或点选合成。</span></div>`;return;}
   if(i.g){const g=GENERATORS.find(g=>g.id===i.g),available=E.unlocked(state,g);$('#selection-bar').innerHTML=`${generatorArt(g.id)}<div class="selected-description"><strong>${g.name} · ${available?`Lv.${state.gens[g.id]}`:'未解锁'}</strong><small>${available?`产出${CHAINS[g.chains[0]].name}与${CHAINS[g.chains[1]].name} · 无需等待`:`抵达${CHAPTERS[g.chapter].name}后开启`}</small></div><div class="selection-actions"><button data-action="workshop" aria-label="查看生成器升级">${icon('info')}</button>${available?`<button data-action="produce" data-id="${g.id}" aria-label="再生成一个物品">${icon('tidy')}</button>`:''}</div>`;return;}
-  $('#selection-bar').innerHTML=`${itemArt(i.c,i.l)}<div class="selected-description"><strong>${itemName(i)} <span style="color:#92967e;font-size:10px">Lv.${i.l}</span></strong><small>${routeProject(i)?`航线建设「${routeProject(i).name}」需要此物品`:i.l===7?'已到最高等级，值得珍藏':'点击相同物品合成，或点击空格移动'}</small></div><div class="selection-actions"><button data-action="item" data-chain="${i.c}" data-level="${i.l}" aria-label="查看物品合成路线">${icon('info')}</button><button data-action="store" aria-label="将选中物品存入仓库">${icon('bag')}</button><button data-action="recycle" aria-label="回收选中物品">${icon('recycle')}</button></div>`;
+  const readySlots=E.readyOrderItems(state).get(selected)||[];
+  const usage=[readySlots.length?`可提交${readySlots.map(slot=>CUSTOMERS[state.orders[slot].customer][0]).join('、')}的委托`:'',routeProject(i)?`航线建设「${routeProject(i).name}」需要此物品`:''].filter(Boolean).join('；');
+  $('#selection-bar').innerHTML=`${itemArt(i.c,i.l)}<div class="selected-description"><strong>${itemName(i)} <span style="color:#92967e;font-size:10px">Lv.${i.l}</span></strong><small>${usage||(i.l===7?'已到最高等级，值得珍藏':'点击相同物品合成，或点击空格移动')}</small></div><div class="selection-actions"><button data-action="item" data-chain="${i.c}" data-level="${i.l}" aria-label="查看物品合成路线">${icon('info')}</button><button data-action="store" aria-label="将选中物品存入仓库">${icon('bag')}</button><button data-action="recycle" aria-label="回收选中物品">${icon('recycle')}</button></div>`;
 }
 function claimable(){return ACHIEVEMENTS.filter(a=>!state.claimed.includes(a.id)&&E.achievementProgress(state,a)>=a.goal).length;}
 function render() {
